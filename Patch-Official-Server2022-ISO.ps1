@@ -215,7 +215,7 @@ public class OfficialIsoHelper {
             byte flags = fullOtBytes[eo + 7];
             if ((flags & 0x02) != 0) continue;
             var sb = new StringBuilder(40);
-            for (int b = 0; b < 20; b++) sb.Append(fullOtBytes[eo + 26 + b].ToString("x2"));
+            for (int b = 0; b < 20; b++) sb.Append(fullOtBytes[eo + 30 + b].ToString("x2"));
             if (targetHashes.Contains(sb.ToString())) {
                 long rSize = (long)(BitConverter.ToUInt64(fullOtBytes, eo) & 0x00FFFFFFFFFFFFFFUL);
                 long rOff  = BitConverter.ToInt64(fullOtBytes, eo + 8);
@@ -440,46 +440,28 @@ $ltscMetaWimPath = Join-Path $tmpDir "ltsc2021_meta.wim"
 [IO.File]::WriteAllBytes($ltscMetaWimPath, $ltscMetaBytes)
 
 $ltscSearchPaths = @(
-    "/Windows/System32/spp/tokens/skus",
-    "/Windows/System32/spp/tokens/pkeyconfig",
-    "/Windows/SysWOW64/spp/tokens/pkeyconfig",
-    "/Windows/servicing/Editions",
-    "/Windows/Branding",
-    "/Windows/System32/Licenses",
-    "/Windows/System32/zh-CN/Licenses",
-    "/Windows/SysWOW64/Licenses",
-    "/Windows/System32/OEMDefaultAssociations.xml"
+    "\Windows\System32\spp\tokens\skus",
+    "\Windows\System32\spp\tokens\pkeyconfig",
+    "\Windows\SysWOW64\spp\tokens\pkeyconfig",
+    "\Windows\servicing\Editions",
+    "\Windows\Branding",
+    "\Windows\System32\Licenses",
+    "\Windows\System32\zh-CN\Licenses",
+    "\Windows\SysWOW64\Licenses",
+    "\Windows\System32\OEMDefaultAssociations.xml",
+    "\Windows\WinSxS\Manifests\amd64_microsoft-windows-s..enterprises-default_31bf3856ad364e35_10.0.19041.1202_none_3fcc9089a7c12fd4.manifest"
 )
 
 $targetHashes = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-$extractPaths = [System.Collections.Generic.List[string]]::new()
 
 foreach ($sp in $ltscSearchPaths) {
     $dirOut = & $wimlib dir $ltscMetaWimPath 1 "--path=$sp" --detailed
-    $curPath = ""
     foreach ($line in $dirOut) {
-        if ($line -match '^Full Path\s+=\s+"([^"]+)"') {
-            $curPath = $matches[1]
-        } elseif ($line -match '^\s*Hash\s+=\s+0x([0-9a-fA-F]{40})') {
+        if ($line -match '^\s*Hash\s+=\s+0x([0-9a-fA-F]{40})') {
             $h = $matches[1]
             if ($h -ne "0000000000000000000000000000000000000000") {
                 [void]$targetHashes.Add($h)
-                $extractPaths.Add($curPath)
             }
-        }
-    }
-}
-
-# Locate amd64_microsoft-windows-s..enterprises-default_*.manifest in LTSC 2021 WinSxS\Manifests
-$manDirOut = & $wimlib dir $ltscMetaWimPath 1 "--path=/Windows/WinSxS/Manifests" --detailed
-$curPath = ""
-foreach ($line in $manDirOut) {
-    if ($line -match '^Full Path\s+=\s+"([^"]+)"') {
-        $curPath = $matches[1]
-    } elseif ($line -match '^\s*Hash\s+=\s+0x([0-9a-fA-F]{40})') {
-        if ($curPath -match 'enterprises-default') {
-            [void]$targetHashes.Add($matches[1])
-            $extractPaths.Add($curPath)
         }
     }
 }
@@ -490,7 +472,7 @@ $ltscSparseWimPath = Join-Path $tmpDir "ltsc2021_sparse.wim"
 [IO.File]::WriteAllBytes($ltscSparseWimPath, $ltscSparseBytes)
 
 $ltscListFile = Join-Path $tmpDir "ltsc_extract_list.txt"
-[IO.File]::WriteAllLines($ltscListFile, $extractPaths)
+[IO.File]::WriteAllLines($ltscListFile, $ltscSearchPaths)
 & $wimlib extract $ltscSparseWimPath 1 "@$ltscListFile" "--dest-dir=$ltscStaging" --preserve-dir-structure --no-acls
 if ($LASTEXITCODE -ne 0) { throw "wimlib extract failed on ltsc2021_sparse.wim" }
 
