@@ -421,114 +421,19 @@ if ($actualSha256 -ne $srvSha256) {
 Write-Host "  Verified SHA-256: $actualSha256 [OK]" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 3. Extract Official LTSC 2021 Assets via HTTP Range & UUP Pro ESD
+# 3. Load Official LTSC 2021 & Pro Assets from OfficialClientFiles
 # ---------------------------------------------------------------------------
-Write-Host "[3/6] Extracting official Client SKU tokens, Editions, Branding & ProductPolicy..." -ForegroundColor Yellow
+Write-Host "[3/6] Loading official Client SKU tokens, Editions, Branding & ProductPolicy..." -ForegroundColor Yellow
 
-$ltscIsoName = "zh-cn_windows_10_enterprise_ltsc_2021_x64_dvd_033b7312.iso"
-$ltscLinkResp = Invoke-RestMethod -Uri "https://ntriver.org/api/drive/generate-link?filename=$ltscIsoName" -Headers @{
-    "X-Original-Referrer" = "https://ntriver.org/download-windows-ltsc"
+$repoOfficialDir = Join-Path $PSScriptRoot "OfficialClientFiles"
+if (Test-Path $repoOfficialDir) {
+    Write-Host "  Using repository OfficialClientFiles ($repoOfficialDir)..." -ForegroundColor Cyan
+    robocopy.exe "$repoOfficialDir\Windows" "$clientOverlay\Windows" /E /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
+    [xml]$entSXml = [IO.File]::ReadAllText((Join-Path $repoOfficialDir "Manifests\enterprises-default.xml"))
+    [xml]$entXml  = [IO.File]::ReadAllText((Join-Path $repoOfficialDir "Manifests\enterprise-default.xml"))
+} else {
+    throw "OfficialClientFiles directory not found at $repoOfficialDir"
 }
-$ltscUrl = $ltscLinkResp.url
-
-$hc = New-Object System.Net.Http.HttpClient
-$hc.Timeout = [TimeSpan]::FromMinutes(5)
-$ltscWimOff = [OfficialIsoHelper]::FindInstallWimOffsetInIso($hc, $ltscUrl)
-$ltscOtBytes = $null
-$ltscMetaBytes = [OfficialIsoHelper]::BuildMetadataWim($hc, $ltscUrl, $ltscWimOff, [ref]$ltscOtBytes)
-$ltscMetaWimPath = Join-Path $tmpDir "ltsc2021_meta.wim"
-[IO.File]::WriteAllBytes($ltscMetaWimPath, $ltscMetaBytes)
-
-$ltscSearchPaths = @(
-    "\Windows\System32\spp\tokens\skus",
-    "\Windows\System32\spp\tokens\pkeyconfig",
-    "\Windows\SysWOW64\spp\tokens\pkeyconfig",
-    "\Windows\servicing\Editions",
-    "\Windows\Branding",
-    "\Windows\System32\Licenses",
-    "\Windows\System32\zh-CN\Licenses",
-    "\Windows\SysWOW64\Licenses",
-    "\Windows\System32\OEMDefaultAssociations.xml",
-    "\Windows\WinSxS\Manifests\amd64_microsoft-windows-s..enterprises-default_31bf3856ad364e35_10.0.19041.1202_none_3fcc9089a7c12fd4.manifest"
-)
-
-$targetHashes = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-
-foreach ($sp in $ltscSearchPaths) {
-    $dirOut = & $wimlib dir $ltscMetaWimPath 1 "--path=$sp" --detailed
-    foreach ($line in $dirOut) {
-        if ($line -match '^\s*Hash\s+=\s+0x([0-9a-fA-F]{40})') {
-            $h = $matches[1]
-            if ($h -ne "0000000000000000000000000000000000000000") {
-                [void]$targetHashes.Add($h)
-            }
-        }
-    }
-}
-
-Write-Host "  Fetching $($targetHashes.Count) unique official LTSC 2021 streams via HTTP Range..."
-$ltscSparseBytes = [OfficialIsoHelper]::BuildSparseWim($hc, $ltscUrl, $ltscWimOff, $ltscMetaBytes, $ltscOtBytes, $targetHashes)
-$ltscSparseWimPath = Join-Path $tmpDir "ltsc2021_sparse.wim"
-[IO.File]::WriteAllBytes($ltscSparseWimPath, $ltscSparseBytes)
-
-$ltscListFile = Join-Path $tmpDir "ltsc_extract_list.txt"
-[IO.File]::WriteAllLines($ltscListFile, $ltscSearchPaths)
-& $wimlib extract $ltscSparseWimPath 1 "@$ltscListFile" "--dest-dir=$ltscStaging" --preserve-dir-structure --no-acls
-if ($LASTEXITCODE -ne 0) { throw "wimlib extract failed on ltsc2021_sparse.wim" }
-
-# Fetch official Microsoft-Windows-EditionSpecific-Professional-Package.ESD from UUP (download.windowsupdate.com)
-Write-Host "  Fetching official EditionSpecific-Professional-Package.ESD from Microsoft Windows Update via UUP API..."
-$uupId = "d397976e-a38d-48a5-b3a0-7e6a0b3c2b27"
-$uupGet = Invoke-RestMethod -Uri "https://api.uupdump.net/get.php?id=$uupId&lang=zh-cn&edition=professional" -TimeoutSec 30
-$proEsdUrl = $uupGet.response.files.'microsoft-windows-editionspecific-professional-package.esd'.url
-if (-not $proEsdUrl) { throw "Failed to get official EditionSpecific-Professional-Package.ESD URL from UUP API" }
-
-$proEsdPath = Join-Path $tmpDir "EditionSpecific-Pro.esd"
-& $aria2c -x8 -s8 --file-allocation=none --console-log-level=warn -d $tmpDir -o "EditionSpecific-Pro.esd" $proEsdUrl
-if ($LASTEXITCODE -ne 0) { throw "Failed to download EditionSpecific-Pro.esd" }
-
-& $wimlib extract $proEsdPath 1 "--dest-dir=$proStaging" --no-acls
-if ($LASTEXITCODE -ne 0) { throw "Failed to extract EditionSpecific-Pro.esd" }
-
-# Assemble unified Client Overlay directory (combining Pro ESD + LTSC 2021 official files)
-robocopy.exe "$ltscStaging\Windows" "$clientOverlay\Windows" /E /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
-
-$proSkuMap = @{
-    "rofessional-license_" = "Professional"
-    "-enterprise-license_" = "Enterprise"
-    "tenterprise-license_" = "IoTEnterprise"
-    "u-education-license_" = "Education"
-    "workstation-license_" = "ProfessionalWorkstation"
-    "-serverrdsh-license_" = "ServerRdsh"
-    "aleducation-license_" = "ProfessionalEducation"
-    "glelanguage-license_" = "ProfessionalSingleLanguage"
-    "tryspecific-license_" = "ProfessionalCountrySpecific"
-}
-foreach ($dir in (Get-ChildItem -Path $proStaging -Directory)) {
-    foreach ($kv in $proSkuMap.GetEnumerator()) {
-        if ($dir.Name -match [regex]::Escape($kv.Key)) {
-            $destSkuDir = Join-Path "$clientOverlay\Windows\System32\spp\tokens\skus" $kv.Value
-            New-Item -ItemType Directory -Force -Path $destSkuDir | Out-Null
-            Copy-Item -Path "$($dir.FullName)\*.xrm-ms" -Destination $destSkuDir -Force
-        }
-    }
-    if ($dir.Name -match 'microsoft-windows-editions-professional_') {
-        $destEdDir = Join-Path "$clientOverlay\Windows\servicing\Editions" ""
-        New-Item -ItemType Directory -Force -Path $destEdDir | Out-Null
-        Copy-Item -Path "$($dir.FullName)\*Edition.xml" -Destination $destEdDir -Force
-    }
-}
-
-# Decompress official enterprises-default.manifest and enterprise-default.manifest
-$wcpDll = (Get-ChildItem "C:\Windows\WinSxS\*_microsoft-windows-servicingstack_*\wcp.dll" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
-if (-not $wcpDll) { $wcpDll = "C:\Windows\System32\wcp.dll" }
-$wcpDict = [OfficialIsoHelper]::ExtractWcpDictionary($wcpDll)
-
-$entSDefMan = (Get-ChildItem -Path "$ltscStaging\Windows\WinSxS\Manifests" -Filter "*enterprises-default*.manifest" | Select-Object -First 1).FullName
-$entDefMan  = (Get-ChildItem -Path $proStaging -Filter "*enterprise-default*.manifest" | Select-Object -First 1).FullName
-
-[xml]$entSXml = [OfficialIsoHelper]::DecompressManifestXml($wcpDict, $entSDefMan)
-[xml]$entXml  = [OfficialIsoHelper]::DecompressManifestXml($wcpDict, $entDefMan)
 
 function Get-ManifestRegMap([xml]$xmlDoc) {
     $map = @{}
@@ -545,7 +450,7 @@ $proReg  = Get-ManifestRegMap $entXml
 $ltscPolicyBytes = [OfficialIsoHelper]::HexToBytes($ltscReg["ProductPolicy"])
 $proPolicyBytes  = [OfficialIsoHelper]::HexToBytes($proReg["ProductPolicy"])
 
-Write-Host "  Decompressed official EnterpriseS Policy ($($ltscPolicyBytes.Length) bytes) & Enterprise/Pro Policy ($($proPolicyBytes.Length) bytes)" -ForegroundColor Green
+Write-Host "  Loaded official EnterpriseS Policy ($($ltscPolicyBytes.Length) bytes) & Enterprise/Pro Policy ($($proPolicyBytes.Length) bytes)" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
 # 4. Extract Official Server 2022 ISO & Mount Index 2 (Desktop Experience)
