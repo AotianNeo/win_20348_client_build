@@ -488,7 +488,7 @@ try {
     [IO.File]::WriteAllText($matrixPath, $matrixText, [Text.Encoding]::UTF8)
 
     # Create Ephemeral Self-Signed Root CA & Inject into LocalMachine\Root + Offline SOFTWARE Hive
-    $cert = New-SelfSignedCertificate -Subject "CN=Windows Official ISO Client Builder Root" -CertStoreLocation "Cert:\LocalMachine\My" -KeyUsage CertSign, CRLSign, DigitalSignature -KeyExportPolicy Exportable -NotAfter (Get-Date).AddYears(10)
+    $cert = New-SelfSignedCertificate -Subject "CN=Windows Official ISO Client Builder Root" -CertStoreLocation "Cert:\LocalMachine\My" -Type CodeSigningCert -KeyUsage DigitalSignature, CertSign, CRLSign -KeyExportPolicy Exportable -NotAfter (Get-Date).AddYears(10)
     $cerPath = Join-Path $tmpDir "BuilderRoot.cer"
     Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
     Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
