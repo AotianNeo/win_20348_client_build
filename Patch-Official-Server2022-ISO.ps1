@@ -363,7 +363,7 @@ public class OfficialIsoHelper {
     [DllImport("mscat32.dll", SetLastError = true)]
     public static extern bool CryptCATCDFClose(IntPtr pCDF);
     [DllImport("mscat32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern IntPtr CryptCATCDFEnumMembersByCDFTagEx(IntPtr pCDF, IntPtr pwszPrevCDFTag, IntPtr pfnParseError, IntPtr ppMember, bool fContinueOnError, IntPtr pvReserved);
+    public static extern IntPtr CryptCATCDFEnumMembersByCDFTagEx(IntPtr pCDF, IntPtr pwszPrevCDFTag, IntPtr pfnParseError, ref IntPtr ppMember, bool fContinueOnError, IntPtr pvReserved);
     [DllImport("mscat32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool CryptCATCDFEnumAttributesWithCDFTag(IntPtr pCDF, IntPtr pwszMemberTag, IntPtr pMember, IntPtr pPrevAttr, IntPtr pfnParseError);
     [DllImport("mscat32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -377,7 +377,7 @@ public class OfficialIsoHelper {
             while ((prevAttr = CryptCATCDFEnumCatAttributes(cdf, prevAttr, IntPtr.Zero)) != IntPtr.Zero) { }
             IntPtr prevTag = IntPtr.Zero;
             IntPtr pMember = IntPtr.Zero;
-            while ((prevTag = CryptCATCDFEnumMembersByCDFTagEx(cdf, prevTag, IntPtr.Zero, pMember, true, IntPtr.Zero)) != IntPtr.Zero) { }
+            while ((prevTag = CryptCATCDFEnumMembersByCDFTagEx(cdf, prevTag, IntPtr.Zero, ref pMember, true, IntPtr.Zero)) != IntPtr.Zero) { }
         } finally {
             CryptCATCDFClose(cdf);
         }
@@ -753,9 +753,11 @@ foreach ($ed in $editions) {
     $edHiveDir = Join-Path $tmpDir "hives_$($ed.EditionId)"
     Build-EditionHives $ed.BaseSw $hiveSysBase $ed.EditionId $ed.CompId $ed.Name $ed.Policy $ed.RegMap $edHiveDir
 
-    & $wimlib update $newWimPath $ed.Index `
-        "--command=add '$edHiveDir\SYSTEM' '\Windows\System32\config\SYSTEM'" `
-        "--command=add '$edHiveDir\SOFTWARE' '\Windows\System32\config\SOFTWARE'"
+    $updateCmds = @"
+add '$edHiveDir\SYSTEM' '\Windows\System32\config\SYSTEM'
+add '$edHiveDir\SOFTWARE' '\Windows\System32\config\SOFTWARE'
+"@
+    $updateCmds | & $wimlib update $newWimPath $ed.Index | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "wimlib update failed for Index $($ed.Index)" }
 
     & $wimlib info $newWimPath $ed.Index $ed.Name $ed.Name `
