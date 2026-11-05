@@ -72,11 +72,13 @@ $oscdimg = Get-ToolPath "oscdimg.exe" @(
     "$WorkDir\tools\oscdimg.exe"
 )
 if (-not $oscdimg) {
-    Write-Host "  Fetching official oscdimg.exe from Windows ADK..."
-    choco install windows-adk-deploytools -y --no-progress | Out-Null
-    $oscdimg = Get-ToolPath "oscdimg.exe" @(
-        "C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe"
-    )
+    Write-Host "  Fetching official x64 oscdimg.exe from Microsoft ADK (download.microsoft.com)..."
+    New-Item -ItemType Directory -Force -Path "$WorkDir\tools" | Out-Null
+    $oscdCab = Join-Path $tmpDir "oscdimg_adk.cab"
+    Invoke-WebRequest -Uri "https://download.microsoft.com/download/e/8/b/e8bec6c1-8153-408d-96b1-ee2985a600ad/adk/Installers/bbf55224a0290f00676ddc410f004498.cab" -OutFile $oscdCab -UseBasicParsing
+    & $sevenZip x $oscdCab "-o$tmpDir\oscd_ext" -y | Out-Null
+    Copy-Item "$tmpDir\oscd_ext\fild40c79d789d460e48dc1cbd485d6fc2e" "$WorkDir\tools\oscdimg.exe" -Force
+    $oscdimg = "$WorkDir\tools\oscdimg.exe"
 }
 
 Write-Host "  wimlib : $wimlib"
@@ -89,7 +91,7 @@ Write-Host "  oscdimg: $oscdimg"
 # ---------------------------------------------------------------------------
 Write-Host "[1/6] Compiling embedded C# helpers..." -ForegroundColor Yellow
 
-Add-Type -ReferencedAssemblies "System.Net.Http" -TypeDefinition @'
+Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -164,7 +166,7 @@ public class OfficialIsoHelper {
                 Buffer.BlockCopy(otBytes, eo, newOt, idx * 50, 50);
                 Buffer.BlockCopy(BitConverter.GetBytes(newOff), 0, newOt, idx * 50 + 8, 8);
                 if (rOff == bootOff && rSize == bootSize) {
-                    ulong bRaw = ((ulong)otBytes[eo + 7] << 56) | (ulong)rSize;
+                    ulong bRaw = (((ulong)otBytes[eo + 7]) << 56) | (ulong)rSize;
                     Buffer.BlockCopy(BitConverter.GetBytes(bRaw), 0, wimHdr, 96, 8);
                     Buffer.BlockCopy(BitConverter.GetBytes(newOff), 0, wimHdr, 104, 8);
                     Buffer.BlockCopy(otBytes, eo + 16, wimHdr, 112, 8);
@@ -176,12 +178,12 @@ public class OfficialIsoHelper {
             ms.Write(xmlBytes, 0, xmlBytes.Length);
 
             byte[] outBytes = ms.ToArray();
-            ulong otRaw = ((ulong)0x02 << 56) | (ulong)newOt.Length;
+            ulong otRaw = (0x02UL << 56) | (uint)newOt.Length;
             Buffer.BlockCopy(BitConverter.GetBytes(otRaw), 0, outBytes, 48, 8);
             Buffer.BlockCopy(BitConverter.GetBytes(newOtOff), 0, outBytes, 56, 8);
             Buffer.BlockCopy(BitConverter.GetBytes((long)newOt.Length), 0, outBytes, 64, 8);
 
-            ulong xmlRaw = ((ulong)0x02 << 56) | (ulong)xmlBytes.Length;
+            ulong xmlRaw = (0x02UL << 56) | (uint)xmlBytes.Length;
             Buffer.BlockCopy(BitConverter.GetBytes(xmlRaw), 0, outBytes, 72, 8);
             Buffer.BlockCopy(BitConverter.GetBytes(newXmlOff), 0, outBytes, 80, 8);
             Buffer.BlockCopy(BitConverter.GetBytes((long)xmlBytes.Length), 0, outBytes, 88, 8);
@@ -263,12 +265,12 @@ public class OfficialIsoHelper {
             ms.Write(xmlBytes, 0, xmlBytes.Length);
 
             byte[] outBytes = ms.ToArray();
-            ulong otRaw = ((ulong)0x02 << 56) | (ulong)finalOt.Length;
+            ulong otRaw = (0x02UL << 56) | (uint)finalOt.Length;
             Buffer.BlockCopy(BitConverter.GetBytes(otRaw), 0, outBytes, 48, 8);
             Buffer.BlockCopy(BitConverter.GetBytes(finalOtOff), 0, outBytes, 56, 8);
             Buffer.BlockCopy(BitConverter.GetBytes((long)finalOt.Length), 0, outBytes, 64, 8);
 
-            ulong xmlRaw = ((ulong)0x02 << 56) | (ulong)xmlBytes.Length;
+            ulong xmlRaw = (0x02UL << 56) | (uint)xmlBytes.Length;
             Buffer.BlockCopy(BitConverter.GetBytes(xmlRaw), 0, outBytes, 72, 8);
             Buffer.BlockCopy(BitConverter.GetBytes(finalXmlOff), 0, outBytes, 80, 8);
             Buffer.BlockCopy(BitConverter.GetBytes((long)xmlBytes.Length), 0, outBytes, 88, 8);
