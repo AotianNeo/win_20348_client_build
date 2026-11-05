@@ -453,9 +453,9 @@ $proPolicyBytes  = [OfficialIsoHelper]::HexToBytes($proReg["ProductPolicy"])
 Write-Host "  Loaded official EnterpriseS Policy ($($ltscPolicyBytes.Length) bytes) & Enterprise/Pro Policy ($($proPolicyBytes.Length) bytes)" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 4. Extract Official Server 2022 ISO & Mount Index 2 (Desktop Experience)
+# 4. Extract Official Server 2022 ISO & Prepare Base WIM via wimlib-imagex
 # ---------------------------------------------------------------------------
-Write-Host "[4/6] Extracting official Server 2022 ISO and mounting Index 2 (Desktop Experience)..." -ForegroundColor Yellow
+Write-Host "[4/6] Extracting official Server 2022 ISO and preparing base Client WIM..." -ForegroundColor Yellow
 
 & $sevenZip x $srvIsoPath "-o$isoExtractDir" -y | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "7z failed to extract Server 2022 ISO" }
@@ -463,176 +463,34 @@ if ($LASTEXITCODE -ne 0) { throw "7z failed to extract Server 2022 ISO" }
 $origWim = Join-Path $isoExtractDir "sources\install.wim"
 Set-ItemProperty -Path $origWim -Name IsReadOnly -Value $false
 
-dism.exe /Mount-Wim /WimFile:$origWim /Index:2 /MountDir:$mountDir /Quiet
-if ($LASTEXITCODE -ne 0) { throw "dism /Mount-Wim failed" }
+$hivesExtractDir = Join-Path $tmpDir "orig_hives"
+New-Item -ItemType Directory -Force -Path $hivesExtractDir | Out-Null
 
-$hivesEntSBase = Join-Path $tmpDir "SOFTWARE_EntS_Base"
-$hivesProBase  = Join-Path $tmpDir "SOFTWARE_Pro_Base"
-$hiveSysBase   = Join-Path $tmpDir "SYSTEM_Base"
+& $wimlib extract $origWim 2 `
+    "\Windows\System32\config\SYSTEM" `
+    "\Windows\System32\config\SOFTWARE" `
+    "\Windows\servicing\Packages\Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" `
+    "--dest-dir=$hivesExtractDir" "--no-acls" "--nullglob" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "wimlib extract of base hives and ServerStandardEdition.mum failed" }
 
-try {
-    $srvStdMum = Get-ChildItem -Path "$mountDir\Windows\servicing\Packages" -Filter "Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if (-not $srvStdMum) { throw "Could not find Microsoft-Windows-ServerStandardEdition.mum in mounted image" }
+$srvStdMum = Get-ChildItem -Path $hivesExtractDir -Filter "Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $srvStdMum) { throw "Could not find Microsoft-Windows-ServerStandardEdition.mum in Index 2" }
 
-    if ($srvStdMum.Name -match '~~([0-9\.]+)\.mum$') {
-        $pkgVer = $matches[1]
-    } else {
-        throw "Could not parse package version from $($srvStdMum.Name)"
-    }
-    Write-Host "  Detected Official Server 2022 Package Version: $pkgVer" -ForegroundColor Cyan
-
-    # Update EditionMatrix.xml in $clientOverlay to match $pkgVer
-    $matrixPath = Join-Path "$clientOverlay\Windows\servicing\Editions" "EditionMatrix.xml"
-    $matrixText = [IO.File]::ReadAllText($matrixPath)
-    $matrixText = $matrixText -replace 'version="10\.0\.[0-9\.]+"', "version=`"$pkgVer`""
-    [IO.File]::WriteAllText($matrixPath, $matrixText, [Text.Encoding]::UTF8)
-
-    # Create Two-Tier Ephemeral Root CA + Windows System Component Leaf Signer & Inject into LocalMachine\Root + Offline SOFTWARE Hive
-    $rootCert = New-SelfSignedCertificate -Type Custom `
-        -Subject "CN=Microsoft Windows Root Authority, O=Microsoft Corporation, C=US" `
-        -KeyUsage CertSign, CRLSign, DigitalSignature `
-        -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 `
-        -NotBefore (Get-Date).AddYears(-5) -NotAfter (Get-Date).AddYears(20) `
-        -CertStoreLocation "Cert:\LocalMachine\My" `
-        -TextExtension @("2.5.29.19={critical}{text}ca=1&pathlength=1")
-
-    $leafCert = New-SelfSignedCertificate -Type Custom `
-        -Subject "CN=Microsoft Windows, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" `
-        -Signer $rootCert `
-        -KeyUsage DigitalSignature `
-        -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 `
-        -NotBefore (Get-Date).AddYears(-5) -NotAfter (Get-Date).AddYears(20) `
-        -CertStoreLocation "Cert:\LocalMachine\My" `
-        -TextExtension @(
-            "2.5.29.19={critical}{text}ca=0",
-            "2.5.29.37={text}1.3.6.1.5.5.7.3.3,1.3.6.1.4.1.311.10.3.6,1.3.6.1.4.1.311.10.3.13"
-        )
-
-    $cerPath = Join-Path $tmpDir "BuilderRoot.cer"
-    Export-Certificate -Cert $rootCert -FilePath $cerPath | Out-Null
-    Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
-
-    reg.exe load "HKLM\OFFLINE_SW" "$mountDir\Windows\System32\config\SOFTWARE" | Out-Null
-    try {
-        $localCertReg = "HKLM\SOFTWARE\Microsoft\SystemCertificates\ROOT\Certificates\$($rootCert.Thumbprint)"
-        $offlineCertReg = "HKLM\OFFLINE_SW\Microsoft\SystemCertificates\ROOT\Certificates\$($rootCert.Thumbprint)"
-        reg.exe copy $localCertReg $offlineCertReg /s /f | Out-Null
-        $offlineAuthReg = "HKLM\OFFLINE_SW\Microsoft\SystemCertificates\AuthRoot\Certificates\$($rootCert.Thumbprint)"
-        reg.exe copy $localCertReg $offlineAuthReg /s /f | Out-Null
-    } finally {
-        [GC]::Collect()
-        [GC]::WaitForPendingFinalizers()
-        reg.exe unload "HKLM\OFFLINE_SW" | Out-Null
-    }
-
-    # Synthesize Microsoft-Windows-EnterpriseSEdition and Microsoft-Windows-ProfessionalEdition .mum + .cat
-    [xml]$stdMumXml = [IO.File]::ReadAllText($srvStdMum.FullName)
-
-    function New-ClientProductPackage([string]$editionId) {
-        $pkgName = "Microsoft-Windows-${editionId}Edition"
-        $fullPkgId = "${pkgName}~31bf3856ad364e35~amd64~~$pkgVer"
-        [xml]$cloneXml = $stdMumXml.OuterXml
-        $cloneXml.assembly.assemblyIdentity.name = $pkgName
-        $cloneXml.assembly.package.identifier = "Windows $editionId Edition"
-
-        $mumFile = Join-Path $pkgStaging "$fullPkgId.mum"
-        $catFile = Join-Path $pkgStaging "$fullPkgId.cat"
-        $catSrcDir = Join-Path $pkgStaging "cat_$editionId"
-        Remove-Item $catSrcDir -Recurse -Force -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Force -Path $catSrcDir | Out-Null
-
-        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-        [IO.File]::WriteAllText($mumFile, $cloneXml.OuterXml, $utf8NoBom)
-        Copy-Item $mumFile -Destination (Join-Path $catSrcDir "$fullPkgId.mum") -Force
-
-        New-FileCatalog -Path $catSrcDir -CatalogFilePath $catFile -CatalogVersion 2.0 | Out-Null
-        Set-AuthenticodeSignature -FilePath $catFile -Certificate $leafCert -HashAlgorithm SHA256 | Out-Null
-        return @{ MumPath = $mumFile; CatPath = $catFile; PackageName = $fullPkgId }
-    }
-
-    $entSPkg = New-ClientProductPackage "EnterpriseS"
-    $proPkg  = New-ClientProductPackage "Professional"
-
-    function Apply-ClientOverlayFiles {
-        # Use robocopy /B (Backup Mode) to bypass TrustedInstaller ACL restrictions on mounted WIM files
-        robocopy.exe "$clientOverlay\Windows" "$mountDir\Windows" /E /B /IS /IT /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
-        foreach ($srvSku in @("ServerStandard", "ServerDatacenter")) {
-            $srvSkuPath = Join-Path "$mountDir\Windows\System32\spp\tokens\skus" $srvSku
-            if (Test-Path $srvSkuPath) {
-                takeown.exe /f $srvSkuPath /r /a /d y | Out-Null
-                icacls.exe $srvSkuPath /grant "*S-1-5-32-544:(OI)(CI)F" /t /q | Out-Null
-                Remove-Item -Path $srvSkuPath -Recurse -Force -ErrorAction SilentlyContinue
-            }
-        }
-        foreach ($edXml in @("ServerStandardEdition.xml", "ServerDatacenterEdition.xml")) {
-            $edXmlPath = Join-Path "$mountDir\Windows\servicing\Editions" $edXml
-            if (Test-Path $edXmlPath) {
-                takeown.exe /f $edXmlPath /a | Out-Null
-                icacls.exe $edXmlPath /grant "*S-1-5-32-544:F" /q | Out-Null
-                Remove-Item $edXmlPath -Force -ErrorAction SilentlyContinue
-            }
-        }
-        $smTaskPath = "$mountDir\Windows\System32\Tasks\Microsoft\Windows\Server Manager\ServerManager"
-        if (Test-Path $smTaskPath) {
-            takeown.exe /f $smTaskPath /a | Out-Null
-            icacls.exe $smTaskPath /grant "*S-1-5-32-544:F" /q | Out-Null
-            $taskText = [IO.File]::ReadAllText($smTaskPath)
-            $taskText = $taskText -replace '<Enabled>true</Enabled>', '<Enabled>false</Enabled>'
-            [IO.File]::WriteAllText($smTaskPath, $taskText, [Text.Encoding]::Unicode)
-        }
-    }
-
-    Apply-ClientOverlayFiles
-
-    # Switch CBS Product Package: ServerStandardEdition -> EnterpriseSEdition
-    Write-Host "  Installing Microsoft-Windows-EnterpriseSEdition ($pkgVer)..."
-    dism.exe /Image:$mountDir /Add-Package /PackagePath:$($entSPkg.MumPath)
-    if ($LASTEXITCODE -ne 0) {
-        if (Test-Path "$mountDir\Windows\Logs\CBS\CBS.log") {
-            Get-Content "$mountDir\Windows\Logs\CBS\CBS.log" -Tail 40 | ForEach-Object { Write-Host "  [CBS] $_" }
-        }
-        throw "Failed to add EnterpriseSEdition package"
-    }
-
-    $srvStdPkgName = $srvStdMum.BaseName
-    Write-Host "  Removing $srvStdPkgName..."
-    dism.exe /Image:$mountDir /Remove-Package /PackageName:$srvStdPkgName
-    if ($LASTEXITCODE -ne 0) { throw "Failed to remove ServerStandardEdition package" }
-
-    Apply-ClientOverlayFiles
-    Copy-Item "$mountDir\Windows\System32\config\SOFTWARE" $hivesEntSBase -Force
-
-    # Also generate the ProfessionalEdition CBS SOFTWARE hive state
-    Write-Host "  Generating Microsoft-Windows-ProfessionalEdition ($pkgVer) CBS state..."
-    dism.exe /Image:$mountDir /Add-Package /PackagePath:$($proPkg.MumPath)
-    if ($LASTEXITCODE -ne 0) { throw "Failed to add ProfessionalEdition package" }
-
-    dism.exe /Image:$mountDir /Remove-Package /PackageName:$($entSPkg.PackageName)
-    if ($LASTEXITCODE -ne 0) { throw "Failed to remove EnterpriseSEdition package" }
-
-    Apply-ClientOverlayFiles
-    Copy-Item "$mountDir\Windows\System32\config\SOFTWARE" $hivesProBase -Force
-    Copy-Item "$mountDir\Windows\System32\config\SYSTEM" $hiveSysBase -Force
-
-    # Ensure both EnterpriseSEdition and ProfessionalEdition .mum/.cat exist in servicing\Packages & CatRoot
-    Copy-Item $entSPkg.MumPath "$mountDir\Windows\servicing\Packages\" -Force
-    Copy-Item $entSPkg.CatPath "$mountDir\Windows\servicing\Packages\" -Force
-    Copy-Item $entSPkg.CatPath "$mountDir\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\" -Force
-    Copy-Item $proPkg.MumPath  "$mountDir\Windows\servicing\Packages\" -Force
-    Copy-Item $proPkg.CatPath  "$mountDir\Windows\servicing\Packages\" -Force
-    Copy-Item $proPkg.CatPath  "$mountDir\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\" -Force
-
-    Write-Host "  Committing base Client image changes to WIM..."
-    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit /Quiet
-    if ($LASTEXITCODE -ne 0) { throw "dism /Unmount-Wim /Commit failed" }
-} catch {
-    dism.exe /Unmount-Wim /MountDir:$mountDir /Discard /Quiet | Out-Null
-    throw
-} finally {
-    Remove-Item "Cert:\LocalMachine\Root\$($rootCert.Thumbprint)" -ErrorAction SilentlyContinue
-    Remove-Item "Cert:\LocalMachine\My\$($rootCert.Thumbprint)" -ErrorAction SilentlyContinue
-    Remove-Item "Cert:\LocalMachine\My\$($leafCert.Thumbprint)" -ErrorAction SilentlyContinue
+if ($srvStdMum.Name -match '~~([0-9\.]+)\.mum$') {
+    $pkgVer = $matches[1]
+} else {
+    throw "Could not parse package version from $($srvStdMum.Name)"
 }
+Write-Host "  Detected Official Server 2022 Package Version: $pkgVer" -ForegroundColor Cyan
+
+# Update EditionMatrix.xml in $clientOverlay to match $pkgVer
+$matrixPath = Join-Path "$clientOverlay\Windows\servicing\Editions" "EditionMatrix.xml"
+$matrixText = [IO.File]::ReadAllText($matrixPath)
+$matrixText = $matrixText -replace 'version="10\.0\.[0-9\.]+"', "version=`"$pkgVer`""
+[IO.File]::WriteAllText($matrixPath, $matrixText, [Text.Encoding]::UTF8)
+
+$hiveSysBase = Join-Path $hivesExtractDir "SYSTEM"
+$hiveSwBase  = Join-Path $hivesExtractDir "SOFTWARE"
 
 # ---------------------------------------------------------------------------
 # 5. Export 4 Client Editions & Inject Per-Edition Hives via wimlib-imagex
@@ -707,8 +565,24 @@ if (Test-Path $newWimPath) { Remove-Item $newWimPath -Force }
 
 # Export base image (Index 2 of $origWim) to $newWimPath Index 1
 Write-Host "  Exporting base image to new install.wim..."
-& $wimlib export $origWim 2 $newWimPath "Windows 10 Enterprise LTSC 2021" "Windows 10 Enterprise LTSC 2021" --compress=LZX
+& $wimlib export $origWim 2 $newWimPath "Windows 10 Enterprise LTSC 2021" "Windows 10 Enterprise LTSC 2021"
 if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 1 failed" }
+
+# Apply official Client overlay files + remove Server SKUs and Server Manager once on Index 1 before cloning Indexes 2-4
+$baseOverlayCmds = @"
+add '$clientOverlay\Windows' '\Windows'
+delete --force --recursive '\Windows\System32\spp\tokens\skus\ServerStandard'
+delete --force --recursive '\Windows\System32\spp\tokens\skus\ServerDatacenter'
+delete --force '\Windows\servicing\Editions\ServerStandardEdition.xml'
+delete --force '\Windows\servicing\Editions\ServerDatacenterEdition.xml'
+delete --force --recursive '\Windows\System32\Tasks\Microsoft\Windows\Server Manager'
+delete --force '\ProgramData\Microsoft\Windows\Start Menu\Programs\Administrative Tools\Server Manager.lnk'
+delete --force '\ProgramData\Microsoft\Windows\Start Menu\Programs\System Tools\Server Manager.lnk'
+delete --force '\Windows\System32\ServerManager.exe'
+delete --force '\Windows\System32\ServerManagerLauncher.exe'
+"@
+$baseOverlayCmds | & $wimlib update $newWimPath 1 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "wimlib base overlay update failed" }
 
 # Instant intra-WIM exports for Indexes 2, 3, 4 (shares 100% of file streams)
 & $wimlib export $newWimPath 1 $newWimPath "Windows 10 IoT Enterprise LTSC 2021" "Windows 10 IoT Enterprise LTSC 2021"
@@ -727,7 +601,7 @@ $editions = @(
         CompId = "EnterpriseS"
         Name = "Windows 10 Enterprise LTSC 2021"
         DisplayName = "Windows 10 企业版 LTSC"
-        BaseSw = $hivesEntSBase
+        BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0x7D)
         RegMap = $ltscReg
     },
@@ -737,7 +611,7 @@ $editions = @(
         CompId = "EnterpriseS"
         Name = "Windows 10 IoT Enterprise LTSC 2021"
         DisplayName = "Windows 10 IoT 企业版 LTSC"
-        BaseSw = $hivesEntSBase
+        BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0xBD)
         RegMap = $ltscReg
     },
@@ -747,7 +621,7 @@ $editions = @(
         CompId = "Enterprise"
         Name = "Windows 10 Pro"
         DisplayName = "Windows 10 专业版"
-        BaseSw = $hivesProBase
+        BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x30)
         RegMap = $proReg
     },
@@ -757,7 +631,7 @@ $editions = @(
         CompId = "Enterprise"
         Name = "Windows 10 Enterprise"
         DisplayName = "Windows 10 企业版"
-        BaseSw = $hivesProBase
+        BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x04)
         RegMap = $proReg
     }
