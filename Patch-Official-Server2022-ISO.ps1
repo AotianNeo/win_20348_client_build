@@ -487,17 +487,38 @@ try {
     $matrixText = $matrixText -replace 'version="10\.0\.[0-9\.]+"', "version=`"$pkgVer`""
     [IO.File]::WriteAllText($matrixPath, $matrixText, [Text.Encoding]::UTF8)
 
-    # Create Ephemeral Self-Signed Root CA & Inject into LocalMachine\Root + Offline SOFTWARE Hive
-    $cert = New-SelfSignedCertificate -Subject "CN=Windows Official ISO Client Builder Root" -CertStoreLocation "Cert:\LocalMachine\My" -Type CodeSigningCert -KeyUsage DigitalSignature, CertSign, CRLSign -KeyExportPolicy Exportable -NotAfter (Get-Date).AddYears(10)
+    # Create Two-Tier Ephemeral Root CA + Windows System Component Leaf Signer & Inject into LocalMachine\Root + Offline SOFTWARE Hive
+    $rootCert = New-SelfSignedCertificate -Type Custom `
+        -Subject "CN=Microsoft Windows Root Authority, O=Microsoft Corporation, C=US" `
+        -KeyUsage CertSign, CRLSign, DigitalSignature `
+        -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 `
+        -NotBefore (Get-Date).AddYears(-5) -NotAfter (Get-Date).AddYears(20) `
+        -CertStoreLocation "Cert:\LocalMachine\My" `
+        -TextExtension @("2.5.29.19={critical}{text}ca=1&pathlength=1")
+
+    $leafCert = New-SelfSignedCertificate -Type Custom `
+        -Subject "CN=Microsoft Windows, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" `
+        -Signer $rootCert `
+        -KeyUsage DigitalSignature `
+        -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 `
+        -NotBefore (Get-Date).AddYears(-5) -NotAfter (Get-Date).AddYears(20) `
+        -CertStoreLocation "Cert:\LocalMachine\My" `
+        -TextExtension @(
+            "2.5.29.19={critical}{text}ca=0",
+            "2.5.29.37={text}1.3.6.1.5.5.7.3.3,1.3.6.1.4.1.311.10.3.6,1.3.6.1.4.1.311.10.3.13"
+        )
+
     $cerPath = Join-Path $tmpDir "BuilderRoot.cer"
-    Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
+    Export-Certificate -Cert $rootCert -FilePath $cerPath | Out-Null
     Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
 
     reg.exe load "HKLM\OFFLINE_SW" "$mountDir\Windows\System32\config\SOFTWARE" | Out-Null
     try {
-        $localCertReg = "HKLM\SOFTWARE\Microsoft\SystemCertificates\ROOT\Certificates\$($cert.Thumbprint)"
-        $offlineCertReg = "HKLM\OFFLINE_SW\Microsoft\SystemCertificates\ROOT\Certificates\$($cert.Thumbprint)"
+        $localCertReg = "HKLM\SOFTWARE\Microsoft\SystemCertificates\ROOT\Certificates\$($rootCert.Thumbprint)"
+        $offlineCertReg = "HKLM\OFFLINE_SW\Microsoft\SystemCertificates\ROOT\Certificates\$($rootCert.Thumbprint)"
         reg.exe copy $localCertReg $offlineCertReg /s /f | Out-Null
+        $offlineAuthReg = "HKLM\OFFLINE_SW\Microsoft\SystemCertificates\AuthRoot\Certificates\$($rootCert.Thumbprint)"
+        reg.exe copy $localCertReg $offlineAuthReg /s /f | Out-Null
     } finally {
         [GC]::Collect()
         [GC]::WaitForPendingFinalizers()
@@ -516,28 +537,16 @@ try {
 
         $mumFile = Join-Path $pkgStaging "$fullPkgId.mum"
         $catFile = Join-Path $pkgStaging "$fullPkgId.cat"
-        $cdfFile = Join-Path $pkgStaging "$fullPkgId.cdf"
+        $catSrcDir = Join-Path $pkgStaging "cat_$editionId"
+        Remove-Item $catSrcDir -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $catSrcDir | Out-Null
 
         $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
         [IO.File]::WriteAllText($mumFile, $cloneXml.OuterXml, $utf8NoBom)
+        Copy-Item $mumFile -Destination (Join-Path $catSrcDir "$fullPkgId.mum") -Force
 
-        $cdfContent = @"
-[CatalogHeader]
-Name=$fullPkgId.cat
-ResultDir=$pkgStaging
-PublicVersion=1
-CatalogVersion=2
-HashAlgorithms=SHA256
-PageHashes=false
-EncodingType=0x00010001
-CATATTR1=0x10010001:OSAttr:2:6.0
-
-[CatalogFiles]
-<HASH>mum=$mumFile
-"@
-        [IO.File]::WriteAllText($cdfFile, $cdfContent, [Text.Encoding]::ASCII)
-        [OfficialIsoHelper]::CreateCatFromCdf($cdfFile)
-        Set-AuthenticodeSignature -FilePath $catFile -Certificate $cert -HashAlgorithm SHA256 | Out-Null
+        New-FileCatalog -Path $catSrcDir -CatalogFilePath $catFile -CatalogVersion 2.0 | Out-Null
+        Set-AuthenticodeSignature -FilePath $catFile -Certificate $leafCert -HashAlgorithm SHA256 | Out-Null
         return @{ MumPath = $mumFile; CatPath = $catFile; PackageName = $fullPkgId }
     }
 
@@ -577,12 +586,17 @@ CATATTR1=0x10010001:OSAttr:2:6.0
 
     # Switch CBS Product Package: ServerStandardEdition -> EnterpriseSEdition
     Write-Host "  Installing Microsoft-Windows-EnterpriseSEdition ($pkgVer)..."
-    dism.exe /Image:$mountDir /Add-Package /PackagePath:$($entSPkg.MumPath) /Quiet
-    if ($LASTEXITCODE -ne 0) { throw "Failed to add EnterpriseSEdition package" }
+    dism.exe /Image:$mountDir /Add-Package /PackagePath:$($entSPkg.MumPath)
+    if ($LASTEXITCODE -ne 0) {
+        if (Test-Path "$mountDir\Windows\Logs\CBS\CBS.log") {
+            Get-Content "$mountDir\Windows\Logs\CBS\CBS.log" -Tail 40 | ForEach-Object { Write-Host "  [CBS] $_" }
+        }
+        throw "Failed to add EnterpriseSEdition package"
+    }
 
     $srvStdPkgName = $srvStdMum.BaseName
     Write-Host "  Removing $srvStdPkgName..."
-    dism.exe /Image:$mountDir /Remove-Package /PackageName:$srvStdPkgName /Quiet
+    dism.exe /Image:$mountDir /Remove-Package /PackageName:$srvStdPkgName
     if ($LASTEXITCODE -ne 0) { throw "Failed to remove ServerStandardEdition package" }
 
     Apply-ClientOverlayFiles
@@ -590,10 +604,10 @@ CATATTR1=0x10010001:OSAttr:2:6.0
 
     # Also generate the ProfessionalEdition CBS SOFTWARE hive state
     Write-Host "  Generating Microsoft-Windows-ProfessionalEdition ($pkgVer) CBS state..."
-    dism.exe /Image:$mountDir /Add-Package /PackagePath:$($proPkg.MumPath) /Quiet
+    dism.exe /Image:$mountDir /Add-Package /PackagePath:$($proPkg.MumPath)
     if ($LASTEXITCODE -ne 0) { throw "Failed to add ProfessionalEdition package" }
 
-    dism.exe /Image:$mountDir /Remove-Package /PackageName:$($entSPkg.PackageName) /Quiet
+    dism.exe /Image:$mountDir /Remove-Package /PackageName:$($entSPkg.PackageName)
     if ($LASTEXITCODE -ne 0) { throw "Failed to remove EnterpriseSEdition package" }
 
     Apply-ClientOverlayFiles
@@ -615,8 +629,9 @@ CATATTR1=0x10010001:OSAttr:2:6.0
     dism.exe /Unmount-Wim /MountDir:$mountDir /Discard /Quiet | Out-Null
     throw
 } finally {
-    Remove-Item "Cert:\LocalMachine\Root\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
-    Remove-Item "Cert:\LocalMachine\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
+    Remove-Item "Cert:\LocalMachine\Root\$($rootCert.Thumbprint)" -ErrorAction SilentlyContinue
+    Remove-Item "Cert:\LocalMachine\My\$($rootCert.Thumbprint)" -ErrorAction SilentlyContinue
+    Remove-Item "Cert:\LocalMachine\My\$($leafCert.Thumbprint)" -ErrorAction SilentlyContinue
 }
 
 # ---------------------------------------------------------------------------
