@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package0414" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Client-Desktop-Required-Package0414" releaseType="Feature Pack">
+    <update name="2ea69c82b99a87df844571d0557a2c48">
+      <component>
+        <assemblyIdentity name="microsoft-windows-client-desktop-required-deployment04140" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" />
+      </component>
+    </update>
+    <update name="7E3B061AED1265FC42872F51D35F366267D1D0E30DFC1052CF95D15AC5A78FCE" restart="required">
+      <driver inf="kdnic.inf" ranking="normal">
+        <assemblyIdentity name="dual_kdnic.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="044CDF18B9A39ED0B7F44538F57E2E21890AB03D5E6D75E661BE3B3BC8C3852D" restart="required">
+      <driver inf="ndisuio.inf" ranking="normal">
+        <assemblyIdentity name="dual_ndisuio.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="3A5202F453B7128327018559AA2C6BA33B0039B6EBA5B3B35CAAE38CA4494C8F" restart="required">
+      <driver inf="npsvctrig.inf" ranking="normal">
+        <assemblyIdentity name="dual_npsvctrig.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="3BA476457439C7A21D6C38726AF105637645154EDD3EF36E9B36652635F96ABF">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Graphics-DirectX-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="38E30CFD31BDD1F2384F1D529329377B18ADDA4BAA816F42AF297FC740D0D473">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package041420" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

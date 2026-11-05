@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0" copyright="Copyright (c) Microsoft Corporation. All Rights Reserved.">
+  <assemblyIdentity name="Containers-OptionalFeature-DisposableClientVM-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Containers-OptionalFeature-DisposableClientVM-zh-CN" releaseType="Language Pack">
+    <parent disposition="detect">
+      <assemblyIdentity name="Containers-OptionalFeature-DisposableClientVM-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+    </parent>
+    <update name="Containers-DisposableClientVM" displayName="Windows 沙盒" description="启用运行 Windows 沙盒方案所需的依赖项。">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Containers-DisposableClientVM-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

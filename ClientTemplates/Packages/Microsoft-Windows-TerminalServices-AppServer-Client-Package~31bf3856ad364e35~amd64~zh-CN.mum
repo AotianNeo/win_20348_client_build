@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0" copyright="Copyright (c) Microsoft Corporation. All Rights Reserved.">
+  <assemblyIdentity name="Microsoft-Windows-TerminalServices-AppServer-Client-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-TerminalServices-AppServer-Client-zh-CN" releaseType="Language Pack">
+    <parent disposition="detect">
+      <assemblyIdentity name="Microsoft-Windows-TerminalServices-AppServer-Client-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+    </parent>
+    <update name="AppServerClient" displayName="远程桌面服务应用程序服务器" description="添加或删除远程桌面服务应用程序服务器">
+      <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+        <ServerComponent Description="远程桌面会话主机(RD 会话主机)支持服务器托管 RemoteApp 程序或基于会话的桌面。用户可连接到某个会话集合中的 RD 会话主机服务器，以便在这些服务器上运行程序、保存文件和使用服务器上的资源。用户可以通过使用远程桌面连接客户端或 RemoteApp 程序来访问 RD 会话主机服务器。" DisplayName="远程桌面会话主机" Id="130" Type="Feature" UniqueName="RDS-RD-Server">
+          <Deploys>
+            <Update Name="AppServerClient" />
+          </Deploys>
+          <SystemServices>
+            <SystemService DefaultMonitoring="true" Name="TermService" />
+          </SystemServices>
+        </ServerComponent>
+      </mum2:customInformation>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-AppServerClient-OptGroup-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package01" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Client-Desktop-Required-Package01" releaseType="Feature Pack">
+    <update name="ccbddb76c5fffb00f98704f0a78b8b15">
+      <component>
+        <assemblyIdentity name="microsoft-windows-client-desktop-required-deployment010" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" />
+      </component>
+    </update>
+    <update name="97A16229388DAB8B1210707D269F430055132711D47B785B2529B12B4CCF4963" restart="required">
+      <driver inf="netwmbclass.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwmbclass.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="E703EA7CA2A9423CAD62931A073DA4FF12CF83BC86DF09DEB7DC8472D5168E44" restart="required">
+      <driver inf="amdgpio2.inf" ranking="normal">
+        <assemblyIdentity name="dual_amdgpio2.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="B356CBCCB3FBB0AE25C958358EA9C067453740D6CFACBD4489836D1D8B69E85A" restart="required">
+      <driver inf="amdi2c.inf" ranking="normal">
+        <assemblyIdentity name="dual_amdi2c.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="696DB0C85342BAE97A4AFD2316A7B4CD4920CFDCCCBD6BEB450069DC4F552742" restart="required">
+      <driver inf="AppleSSD.inf" ranking="normal">
+        <assemblyIdentity name="dual_AppleSSD.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="677FEC6F915962561C938A98E49ED84C3803A1BDB98A3762FCB01F7BE9B91F29" restart="required">
+      <driver inf="athw8x.inf" ranking="normal">
+        <assemblyIdentity name="dual_athw8x.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="E6F1D1C0705ED2975919CE91CB45982FA7701070291C1B28CE00B9EFE92246E9" restart="required">
+      <driver inf="bcmdhd64.inf" ranking="normal">
+        <assemblyIdentity name="dual_bcmdhd64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="EEED9462B3F793799184CC49327BF0E53038ECEF23E25146ACC5D766B66A6842" restart="required">
+      <driver inf="bcmfn2.inf" ranking="normal">
+        <assemblyIdentity name="dual_bcmfn2.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="E5631DA777A33B63AB8909CD069E0F76FF0EBB205A87032AC7DC7D7161E3894C" restart="required">
+      <driver inf="bcmwdidhdpcie.inf" ranking="normal">
+        <assemblyIdentity name="dual_bcmwdidhdpcie.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="79DCD1F18954FA50304FEA238BFA75FBE3DCB9E5059A8542179AF337306F747F" restart="required">
+      <driver inf="iagpio.inf" ranking="normal">
+        <assemblyIdentity name="dual_iagpio.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="4D8EAC3BC0541E6460CDF966FF0341EF390E89CFCDA978D50032C778B2903260" restart="required">
+      <driver inf="iaLPSS2i_GPIO2_BXT_P.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_GPIO2_BXT_P.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="8E186FC2589A7852E5556B1FDD200FB59A326C16B76CED3F9471F98253C5D065" restart="required">
+      <driver inf="iaLPSS2i_GPIO2_CNL.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_GPIO2_CNL.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="5E18EF8305144716ABAAD8AADD892B4FD15BFEC12A758682C1714BDA4B81C470" restart="required">
+      <driver inf="iaLPSS2i_GPIO2_GLK.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_GPIO2_GLK.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="B0F63FA4A648D690212ACF4F2F6D15877E2F08FB8EBA178F5B016AF709BEA483" restart="required">
+      <driver inf="iaLPSS2i_GPIO2_SKL.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_GPIO2_SKL.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="A90D8463F2ACA57DC4CC6F4960D79BDC7DC32FD6B3A1F58B38EF9358F98BE3BA" restart="required">
+      <driver inf="iaLPSS2i_I2C_BXT_P.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_I2C_BXT_P.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="BD204C911C92734FC93BF5AFFAEB147F89102F50511E3191168E4631946E2C52" restart="required">
+      <driver inf="iaLPSS2i_I2C_CNL.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_I2C_CNL.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="A23C440A0CC70DED0C8F3610C3AE9FA8B4704E10157AD70F23AAD1A90C8CC15F" restart="required">
+      <driver inf="iaLPSS2i_I2C_GLK.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_I2C_GLK.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="B1165A437B6B98DD47B7DC4116340C4789D5797F7C039305FF51925F0E1261A5" restart="required">
+      <driver inf="iaLPSS2i_I2C_SKL.inf" ranking="normal">
+        <assemblyIdentity name="dual_iaLPSS2i_I2C_SKL.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="FFF06A596AB2DC2BA8DC9B28D73F4CF7C621661FB38F5AEEDEFF5F6D90D2B559" restart="required">
+      <driver inf="mbtr8897w81x64.inf" ranking="normal">
+        <assemblyIdentity name="dual_mbtr8897w81x64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="8DF42F97088FFA5948A52FD127D56DFD5B4EB9C078ADB42AC000A042B78560E0" restart="required">
+      <driver inf="mrvlpcie8897.inf" ranking="normal">
+        <assemblyIdentity name="dual_mrvlpcie8897.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="4B73F017CA478378C31BEF590BEFF8B2D7231EC6A2E175AC1B1D5022D19DF47D" restart="required">
+      <driver inf="net8185.inf" ranking="normal">
+        <assemblyIdentity name="dual_net8185.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="7D613D079CC4DB06790FF7A472512C536AC80A949EA21893AA453B5A9FD11BCE" restart="required">
+      <driver inf="net8187bv64.inf" ranking="normal">
+        <assemblyIdentity name="dual_net8187bv64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="102F6DD582AE415C48340302BC5E340C49E847ADA0FB1096C7851D7E322A40E1" restart="required">
+      <driver inf="net8187se64.inf" ranking="normal">
+        <assemblyIdentity name="dual_net8187se64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="D9906E628B5606A0995E4D898912E98E8536EE3880AB59EBA6E35EFD61B8AF93" restart="required">
+      <driver inf="net8192se64.inf" ranking="normal">
+        <assemblyIdentity name="dual_net8192se64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="B7798673F991187885B3268F3602B0A56A0E290B61D305F3F2B0675EC17B7BDB" restart="required">
+      <driver inf="net819xp.inf" ranking="normal">
+        <assemblyIdentity name="dual_net819xp.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="EE6CAE3E6F0E65F852514E520280D5B018EBE3453371EBF948B72A91EF642D8F" restart="required">
+      <driver inf="netathr10x.inf" ranking="normal">
+        <assemblyIdentity name="dual_netathr10x.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="AB1731EC7FE28DFEE241EF84F1FA85D68650BD43D59788C5F4F2596C2D5354C0" restart="required">
+      <driver inf="netathrx.inf" ranking="normal">
+        <assemblyIdentity name="dual_netathrx.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="56757317C9A2A1055CD57A5CC8C82E9D92FDBA14645ECD582F6EFEDCBAB09292" restart="required">
+      <driver inf="netbc63a.inf" ranking="normal">
+        <assemblyIdentity name="dual_netbc63a.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="9536E03DCD1A3040C658979FB38E6317AB40BB37380F5E6887C784CAB4E6BFAD" restart="required">
+      <driver inf="netbc64.inf" ranking="normal">
+        <assemblyIdentity name="dual_netbc64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="AC56D2175331CE9281B3C8692F44609BB956E524297ED033AB1DDE67003ED109" restart="required">
+      <driver inf="netrtwlane.inf" ranking="normal">
+        <assemblyIdentity name="dual_netrtwlane.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="4A33CE65964E7DD82E6612A8345F3D4ED5372F3B252C864A726E1413F77E5B5B" restart="required">
+      <driver inf="netrtwlane01.inf" ranking="normal">
+        <assemblyIdentity name="dual_netrtwlane01.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="6B88233D9D2EB8D95F881FF983755F3CEB6BD67E4F78664DC5FD4AA9B1CD2217" restart="required">
+      <driver inf="netrtwlane_13.inf" ranking="normal">
+        <assemblyIdentity name="dual_netrtwlane_13.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="AD76D6EAD6A5E090C2F36CB972EBB2EBA1F63390D8F5C2EDEB8D667207CD0DE7" restart="required">
+      <driver inf="netwbw02.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwbw02.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="3D6115651917CD48254CB4EB95A81EEF8846C098CDB15244B5FCEBD0C832E82A" restart="required">
+      <driver inf="netwew00.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwew00.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="3FCD06D63DB362A946FDD4B51944D77DF668F2D29992CE445FFE1504A549A912" restart="required">
+      <driver inf="netwew01.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwew01.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="299C18F704309427274537D7E5B15DA177D1E8940B1F4C0ED17DCA703A1CC34B" restart="required">
+      <driver inf="netwlv64.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwlv64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="CC4CB9F72731DD5084EB32FA365951989EA52130DF05652DA5C410E4A31D3784" restart="required">
+      <driver inf="netwns64.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwns64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="AF965FA9744DFBF2EF50DBCCDD073461B243A1434DDEB9CF87C6C01C34F518F5" restart="required">
+      <driver inf="netwsw00.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwsw00.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="E2EEA76D96FA632D2979B9A809220B196B84C7A65E3331B4F6F64FDAB3B046D4" restart="required">
+      <driver inf="netwtw02.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwtw02.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="0D4259A887088B66A425E5DD8F260B1A8AB1EA16A8E125F2EDB5194E667A1209" restart="required">
+      <driver inf="netwtw04.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwtw04.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="4A6D908AA68EA796F41E213D9B4C08DB7C5B3218835570CB4B33F46D06562C31" restart="required">
+      <driver inf="netwtw06.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwtw06.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="8188FD0EAE40B4E85C0A6D88AB10A18D66BA68D40D8F7EC63D2BB793AC833FF3" restart="required">
+      <driver inf="netwtw08.inf" ranking="normal">
+        <assemblyIdentity name="dual_netwtw08.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="666183DEF3E4D3F3CBDD0545A4FDB313FE3B1D50BA7D6D50E54A585B6CCF0D95" restart="required">
+      <driver inf="qcwlan64.inf" ranking="normal">
+        <assemblyIdentity name="dual_qcwlan64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="4360A1FB18B21F1400A1845E4029DF14045008DE723BBDEF135BD40824EE18AB" restart="required">
+      <driver inf="rtvdevx64.inf" ranking="normal">
+        <assemblyIdentity name="dual_rtvdevx64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="7FB81F0D01096248BA6C91737951C8D141D87761358D0EC096DA0E31E6A7D9E4" restart="required">
+      <driver inf="netirda.inf" ranking="normal">
+        <assemblyIdentity name="dual_netirda.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="7AECCDC5AA5FE4B1B52D9232D74D8B20E3426CB1BFAA7ED7AD0F7E5A6F44C566" restart="required">
+      <driver inf="iai2c.inf" ranking="normal">
+        <assemblyIdentity name="dual_iai2c.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="CB4257975077A0D410C030C85C8B27AA8DF744FF22B9D024907716F6688A39E6" restart="required">
+      <driver inf="intelpmax.inf" ranking="normal">
+        <assemblyIdentity name="dual_intelpmax.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="BB3A236FECA1B468DE8F937D24EAF0E4231F0DB830EBB61C89CB1CFB7D8A8816" restart="required">
+      <driver inf="net1ic64.inf" ranking="normal">
+        <assemblyIdentity name="dual_net1ic64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="23D0C2A664412CD3A25D65FC91491D5ED30D4FCC4312F0A405E845B7367F6223" restart="required">
+      <driver inf="net2ic68.inf" ranking="normal">
+        <assemblyIdentity name="dual_net2ic68.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="B32208658C7C543B7EFCEEFF546D8F37FA694553251720576DEC5E5B60348FD1" restart="required">
+      <driver inf="net8192su64.inf" ranking="normal">
+        <assemblyIdentity name="dual_net8192su64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="0FE6F71F9BAD113B9C45F854A9B9C59EC3DA639E2B73A97F69DB2CF3A9C1014A" restart="required">
+      <driver inf="netr28ux.inf" ranking="normal">
+        <assemblyIdentity name="dual_netr28ux.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="791E57A9B8D4FA043AC0441CBF030881EE38417CD05553D08553BAB36F2F7C48" restart="required">
+      <driver inf="netr28x.inf" ranking="normal">
+        <assemblyIdentity name="dual_netr28x.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="126FA901FE7FC5F859B061DB7CFEEC0EF34A9CBDE7DE4DA65E8FA0576E0726CC" restart="required">
+      <driver inf="netr7364.inf" ranking="normal">
+        <assemblyIdentity name="dual_netr7364.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="BC22E4185A570177B71B7C223338EEEDD184A423189BB8604649C0F965717078" restart="required">
+      <driver inf="netrtwlans.inf" ranking="normal">
+        <assemblyIdentity name="dual_netrtwlans.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="BFBB1422D4B8FAAE8B4FF206D7F2AF20409297C2A1395C615CE0A719DA3889EB" restart="required">
+      <driver inf="netrtwlanu.inf" ranking="normal">
+        <assemblyIdentity name="dual_netrtwlanu.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="D76C610B6C6EA5F11664C665100476C292070A471DA2471B2E0C45EE1C4DAF3D" restart="required">
+      <driver inf="rtcx21x64.inf" ranking="normal">
+        <assemblyIdentity name="dual_rtcx21x64.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="D5EF8E0E55E33AC3183562CB34AD3342293D842B415D2ECAE91E20E2FF8DE963" restart="required">
+      <driver inf="rtwlanu_oldIC.inf" ranking="normal">
+        <assemblyIdentity name="dual_rtwlanu_oldIC.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="4A255AC2EC2C529D250412A2CDCE531B010691ADD72173519C1DAD8D6693C65C" restart="required">
+      <driver inf="usbncm.inf" ranking="normal">
+        <assemblyIdentity name="dual_usbncm.inf" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="9316928A9A8326157DCDED8B8F2164A3435806A22A55A8D7FC0F318066CE0697" restart="required">
+      <driver inf="ChargeArbitration.inf" ranking="normal">
+        <assemblyIdentity name="dual_ChargeArbitration.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+  </package>
+</assembly>

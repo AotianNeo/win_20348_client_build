@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0" copyright="Copyright (c) Microsoft Corporation. All Rights Reserved.">
+  <assemblyIdentity name="Microsoft-Windows-Client-Features-Package" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Client-Features" releaseType="Feature Pack">
+    <update name="755273e1e3d8891cd0d800be91f4b8ef">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Features-merged-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="fc0d60ecae9730160d4af9bb0ca3213e">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-VID-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="57da1ae7864d54a5febed6bc47af446b">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Clipboard-Extensions-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="5c9228f061001df926247a5db7b15265">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Media-Capture-Internal-BroadcastDVR-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="7de482750d1b061a84de926f740cc727">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-NetworkSwitch-Management-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="290e783658a04a4d745d9fcfa37d5c3a">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-AuthzHelper-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="d9e674b2880e43adb41fe05f2235a8cc">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Biometrics-FaceRecognition-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="2122fbd9270d295e8d6ff55659faf122">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Bluetooth-EnableSwiftPairByDefault-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="ae63b61f83681cef4d9fb46168366d46">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Bluetooth-User-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="f51ff4c6892877ff53320c07ffa2957c">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Cellcore-Data-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="bf1ccb4e06af0ec2d494ea518fd73a84">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Cellcore-Data-Desktop-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="ae908ee05a14a85340f84c357b4fad84">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-CellularTime-Service-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="32622644449f7f7951b1140cbac6244c">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-CoreSystem-WinHTTPCom-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="24b45d441ea6249aca36b38253c40f66">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-DAFWiProv-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="24e696f3db732b1c016be1049a814d91">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Graphics-Display-DisplayEnhancementService-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="080a457bc99c89e98d23ddb1aca551cd">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Hid-Telephony-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="80d37eab8f34c5ff97beaf49f4f7b2c4">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-InputProcessors-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="d90cc08d5d09a70cb03457e04ce2a0c6">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-InputProcessors-Settings-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="3f11596e0334d80351044d8c81994083">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Network-LegacyTdx-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="e060d5b5e0e68d45ffe7c643ae72fa14">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-NetworkDataUsage-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="746480aa85a3f38d3ba2824310f13cb3">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Networking-XboxLive-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="35d839eeac2f1051329c6c0e94d2f7f0">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-PayloadRestrictions-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="a515267bc17c4e7f13154b3b52a8c441">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-PenService-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="ff58c5a729608d46ef11a4b1d510aecd">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-ResourceMapping-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="f59dfd0a8fd84bd769d721d8835aec6b">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-RetailDemo-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="41100812b9f804c678e06740cfa71b7c">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-SecureBio-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="aa95cef2fd1c8e9bb0200ecbfac6ba03">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Security-Octagon-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-OneCore-SystemSettings-UserAccount">
+      <selectable disposition="absent">
+        <detectNone default="true" />
+        <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+          <mum2:EnableSelectabilityForEditions>
+            <mum2:EnableSelectabilityForEdition name="Microsoft-Windows-IoTEnterpriseSEdition" />
+          </mum2:EnableSelectabilityForEditions>
+        </mum2:customInformation>
+      </selectable>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-SystemSettings-UserAccount-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="d78f8ecc71c9f510bef6fdfc588bfde2">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Telephony-UniversalComponents-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="b38d4217e739de5e5db5a1f69bce0de0">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-TroubleShooting-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="4be1a27614544388bf1f5bf0fedc1148">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Update-UX-Desktop-UserPredictionModel-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="9a3f5ab846bd56650bb153f5fbdfcbac">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-UPnP-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="056165f9da04e83c172c16c6652924f3">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-UPnP-DeviceHost-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="5222cd322de7621156d4063da5d04dc5">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-UPnP-Full-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="74a95330c532692c7cf7a70ce16db670">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-VirtualizationBasedSecurity-Package" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="2e7cbae073e69f3e3efb4a87cf65ec5b">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCoreUAP-Feedback-String-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="0a20484361b79b20e221322041f59d3f">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-ABSD-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="c6e01eb3d263f3d8ab380fe1a838ffe6">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Analog-Simulation-Desktop-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="4dc9ef288446941c0b386211a8aa2d79">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Audio-VolumetricAudioCompositor-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="41b276ff4480cfc0728ba9ad956c6f8d">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Backup-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="19173e41875b94dce7dc1d03137933cc">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Base-Utilities-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="fb71d16050586083652fefe7141f535c">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-BLB-Client-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="f6288676a8e6d8719aba4eb1f2a95b11">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-ClientPerf-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="74055053a53ed217e0fa05721fcc39a2">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Cluster-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="a181cbb1fac3530bdb79f7c5d9ee7bfd">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-CodeIntegrity-Diagnostics-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="f90732d52e20900213956fdb636cf7df">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-CoreSystem-Cosa-Desktop-Client-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="c0d9e04fd9d23b5e337e2b85322616a1">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-DataIntegrityScan-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="506237af1c7eca3749ec74e693a893c3">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Desktop-Shared-Package" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="15badf5f1cb7ad65898df5179b2e9593">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-DiagnosticExecution-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Windows-EnterpriseClientSync-Host">
+      <selectable disposition="absent">
+        <detectNone default="true" />
+        <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+          <mum2:EnableSelectabilityForEditions>
+            <mum2:EnableSelectabilityForEdition name="Microsoft-Windows-IoTEnterpriseSEdition" />
+          </mum2:EnableSelectabilityForEditions>
+        </mum2:customInformation>
+      </selectable>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-EnterpriseClientSync-Host-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="c71c14bed7f22f1c03834c6136e57620">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-FileHistory-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="5951039375e593e209eb4235f7d5fea9">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Holographic-Api-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="8bdf7f9a048478d9786e6b6c9e0d3d31">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-HyperV-Guest-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="bcab17a011705bc37f5d2b4b9cb1510b">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-HypervisorEnforcedCodeIntegrity-Sysprep-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="cd156003eca912896758e13829bf7e0a">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-InstallShieldWow64-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="210f27cc0035b11a81f45b5d4088d64b">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-IRDA-CPL-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Windows-Legacy-Components-OC">
+      <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+        <mum2:noAutoMerge />
+      </mum2:customInformation>
+      <selectable disposition="absent">
+        <detectNone default="true" />
+        <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+          <mum2:EnableSelectabilityForEditions>
+            <mum2:EnableSelectabilityForEdition name="Microsoft-Windows-IoTEnterpriseSEdition" />
+          </mum2:EnableSelectabilityForEditions>
+        </mum2:customInformation>
+      </selectable>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Legacy-Components-OC-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="40c3d52d92d81338b95ba084768fda7d">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-MemoryDiag-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="e4e69c18e5b7d9a34e8def994f4b0ba4">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-MSInfo-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="74922798ea52f2b0c0a85e513ca978b7">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-NcdAutoSetup-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="031f8ae7c41df6280b5a9c7ac24dd765">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Network-Security-MPSSVC-Diagnostics-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="1cbe4163b99525d667922ebcfd081b83">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Package-UNP-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="26e3596dc32a358c1507685a6d984993">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-PeerToPeer-Full-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="76870d0e12b42ef2c87d8dab29899c93">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-PredictionUnit-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="3381b654c9e081352293713d3bd78b88">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Printing-EDU-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Windows-Printing-Foundation">
+      <selectable disposition="absent">
+        <detectNone default="true" />
+        <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+          <mum2:EnableSelectabilityForEditions>
+            <mum2:EnableSelectabilityForEdition name="Microsoft-Windows-IoTEnterpriseSEdition" />
+          </mum2:EnableSelectabilityForEditions>
+        </mum2:customInformation>
+      </selectable>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Printing-Foundation-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="7e4ae2ab0cebef4576236db2fe93a2c9">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Printing-PortMon-Client-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="c24b2a8cf1114f6217b7ea34a979afe0">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Provisioning-Platform-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="64d56e2e38bb41916ea137212a681fd0">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Proximity-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Windows-RDC">
+      <selectable disposition="absent">
+        <detectNone default="true" />
+        <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+          <mum2:EnableSelectabilityForEditions>
+            <mum2:EnableSelectabilityForEdition name="Microsoft-Windows-IoTEnterpriseSEdition" />
+          </mum2:EnableSelectabilityForEditions>
+        </mum2:customInformation>
+      </selectable>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-RDC-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="13e348b6d5154cdb5db27d07b19cccbf">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-ReadyBoost-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="095a238451c2dd5748df3d868f109bce">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-RecDisc-SDP-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="1bb267af30bbb5cd718b282799bb695b">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-SecurityCenter-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="ce44fbfc57e87fbf73c7f0dcde33c185">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-ShareMedia-ControlPanel-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="343806e5bedd9787a4b307cbbfb1f959">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Shell-Docking-Input-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="d150eda82db926103c3139e7225b7b2a">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Shell-HomeGroup-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="adea1a8e4385935a22b9406e7bea1b90">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Shell-RetailDemo-Desktop-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Windows-Shell-Wallpaper-Common">
+      <selectable disposition="absent">
+        <detectNone default="true" />
+        <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+          <mum2:EnableSelectabilityForEditions>
+            <mum2:EnableSelectabilityForEdition name="Microsoft-Windows-IoTEnterpriseSEdition" />
+          </mum2:EnableSelectabilityForEditions>
+        </mum2:customInformation>
+      </selectable>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Shell-Wallpaper-Common-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="a2a0d69de309d4108f3cff685f479c64">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-StorageSpaces-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="16f79ce85ab5e07cd8ed5a1cb3137cdb">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-SystemMaintenance-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="33259082dbc7c34d93b4347f7fd8c4eb">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-SystemRestore-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="46fe7e7758efcf8f4f5a37e586418308">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-TerminalServices-Collaboration-RelayTransport-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="0cd809a4e0d615e7d28407532f22fa06">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-WebDav-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="f5bf59916704882d18b524ee5cd23d69">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-WindowsCore-SystemSettings-Clipboard-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="9100f6bc0a784ea8874dfceaa0671098">
+      <mum2:customInformation xmlns:mum2="urn:schemas-microsoft-com:asm.v3">
+        <mum2:noAutoMerge />
+      </mum2:customInformation>
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Optional-Features-Package" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

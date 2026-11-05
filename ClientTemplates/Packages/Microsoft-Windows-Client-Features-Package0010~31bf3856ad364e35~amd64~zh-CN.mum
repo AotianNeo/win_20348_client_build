@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity name="Microsoft-Windows-Client-Features-Package0010" version="10.0.20348.3089" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Client-Features-Package0010" releaseType="Language Pack">
+    <update name="8B8ED49C78C32DFF1472F0E604E2FCA4F41C3DC4EE3C004DCACDFB5BEE50303F">
+      <component>
+        <assemblyIdentity name="microsoft-windows-client-features-deployment00100" version="10.0.20348.3089" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" />
+      </component>
+    </update>
+  </package>
+</assembly>

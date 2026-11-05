@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package041420" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Client-Desktop-Required-Package041420" releaseType="Feature Pack">
+    <update name="233F719EAA7CE55F93B97A4E65E00B95AF5F60B34556D37AF75FDDEFEF94049F">
+      <component>
+        <assemblyIdentity name="microsoft-windows-client-desktop-required-deployment0414200" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" />
+      </component>
+    </update>
+    <update name="ECB747D24EC79A0AAFCB97B7A9EFF609A050E5E2FCA057E2F258B92E7464152F" restart="required">
+      <driver inf="basicdisplay.inf" ranking="normal">
+        <assemblyIdentity name="dual_basicdisplay.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="1BB8FE14BE1AC2D1B0D53ABFD231E3FA33DEB6A6B6356AAE9DC604480C647CB0" restart="required">
+      <driver inf="basicrender.inf" ranking="normal">
+        <assemblyIdentity name="dual_basicrender.inf" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="0104282CB3E930C9D4D5792208A399783AFEAF417BCD048301057482ED22BF67" restart="required">
+      <driver inf="display.inf" ranking="normal">
+        <assemblyIdentity name="dual_display.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="36aad41722d714dca639842e6d021cc9">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Graphics-DirectX-Core-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="00cda6b3ee18c80b2d7da306b48b6ca4">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Graphics-Required-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="6aeaf7d6cadc007fe3750cd0f1dad546">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCore-Graphics-Required-Core-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="dcd1f6d7f27668573df7c90d72cce3b8">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package04142030" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

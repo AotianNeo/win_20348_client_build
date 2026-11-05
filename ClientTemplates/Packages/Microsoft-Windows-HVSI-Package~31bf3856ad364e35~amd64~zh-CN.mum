@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0" copyright="Copyright (c) Microsoft Corporation. All Rights Reserved.">
+  <assemblyIdentity name="Microsoft-Windows-HVSI-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-HVSI-zh-CN" releaseType="Language Pack">
+    <parent disposition="detect">
+      <assemblyIdentity name="Microsoft-Windows-HVSI-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+    </parent>
+    <update name="Windows-Defender-ApplicationGuard" displayName="Microsoft Defender 应用程序防护" description="提供用于 Internet 浏览的安全容器">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-HVSI-Components-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Containers-Server-For-Application-Guard" displayName="容器服务器" description="容器服务器">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Containers-ApplicationGuard-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Onecore-SPP-VirtualDevice" displayName="继承的激活虚拟设备" description="继承的激活虚拟设备">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Onecore-SPP-VirtualDevice-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-OneCoreUAP-AppRuntime-RemoteAppLifetimeManager" displayName="远程应用生存期管理器" description="管理容器中应用的生命周期">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-OneCoreUAP-AppRuntime-RemoteAppLifetimeManager-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="HyperV-KernelInt-VirtualDevice" displayName="Microsoft NT 内核集成虚拟设备" description="Microsoft NT 内核集成虚拟设备">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-KernelInt-VirtualDevice-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="HyperV-Guest-KernelInt" displayName="Microsoft NT 内核集成 VSC 驱动程序" description="Microsoft NT 内核集成 VSC 驱动程序">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-Guest-KernelInt-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="60189715171151231eb02caef9611cc3">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Containers-Guest-Gated-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

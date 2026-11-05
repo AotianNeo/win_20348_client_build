@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Client-Desktop-Required-Package" releaseType="Feature Pack">
+    <update name="066F3F393695C44590581B417E8422680CF34E5BEC5A564C757CE84034AB42C4">
+      <component>
+        <assemblyIdentity name="microsoft-windows-client-desktop-required-deployment0" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" />
+      </component>
+    </update>
+    <update name="28743C2AEEB67F36DFE258D87AA0E78CDEB595A74BD655AAFA14B2DFF2F05F48" restart="required">
+      <driver inf="microsoft_bluetooth_a2dp.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_microsoft_bluetooth_a2dp.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="90A4CFBA30C67F9547168E1D829F897E6A844F6F7E62883C06F6D36A05B93929" restart="required">
+      <driver inf="microsoft_bluetooth_avrcptransport.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_microsoft_bluetooth_avrcptransport.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="408F4685BA7A7D94FAB58FF7968696379B49D19AA4D02276433C916D69F50DFA" restart="required">
+      <driver inf="btampm.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_btampm.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="5EAEEC0F85A4CBFECE8815260275A364573D62CC6A0105AF315BDFC030759C14" restart="required">
+      <driver inf="microsoft_bluetooth_hfp.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_microsoft_bluetooth_hfp.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="E53D6BC198F0341664E6C9CB425B24A9114821EDBC4B3739F8DED4DC3A2B9509" restart="required">
+      <driver inf="microsoft_bluetooth_a2dp_snk.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_microsoft_bluetooth_a2dp_snk.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="0FF59EFEAC10776770E4B2242765AD0301C3C4E8C54764C91B525A14C8874855" restart="required">
+      <driver inf="microsoft_bluetooth_a2dp_src.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_microsoft_bluetooth_a2dp_src.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="8E6FF7D2A55054AE123309EABD6682E293BA526D6FCC392D06FC899D1D77DEC7" restart="required">
+      <driver inf="microsoft_bluetooth_hfp_ag.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_microsoft_bluetooth_hfp_ag.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="7055E3D7C9545FE44835B0EF1ADFA43BE438BBE45D914BE1B64012E6DFFD2B61" restart="required">
+      <driver inf="microsoft_bluetooth_hfp_hf.inf" ranking="normal">
+        <assemblyIdentity name="Product-onecore__dual_microsoft_bluetooth_hfp_hf.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="47269558931EA0C9B81C072C0EED4E045317A0E6F7B75D6460D5B222C559061E" restart="required">
+      <driver inf="dc1-controller.inf" ranking="normal">
+        <assemblyIdentity name="dual_dc1-controller.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="5FB19C60FBF5BDA082EBC45CA34D084A0AC60F87AD92F99AA4F1AF096E204046" restart="required">
+      <driver inf="xboxgip.inf" ranking="normal">
+        <assemblyIdentity name="dual_xboxgip.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="AD4E8215FC832528457AF01CC457A89D78D37858EFBFF1BE8752A8BB2D2C7B7D" restart="required">
+      <driver inf="xboxgipsynthetic.inf" ranking="normal">
+        <assemblyIdentity name="dual_xboxgipsynthetic.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="401BB5C6727F873EE740B1B4BB926D008B1EEA960DF6549DAE0F100A4D13B2AE" restart="required">
+      <driver inf="xinputhid.inf" ranking="normal">
+        <assemblyIdentity name="dual_xinputhid.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="D232DE5AEBBE1DC88E26A03DAF3A6B825E942D7F384BDEECDDE11AAE7D19A9B4" restart="required">
+      <driver inf="xusb22.inf" ranking="normal">
+        <assemblyIdentity name="dual_xusb22.inf" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" type="dualModeDriver" />
+      </driver>
+    </update>
+    <update name="E8FE2FDFB11DAE2573018D58A0BB2805FEB9925936C09BCA8DC6115771D78504">
+      <package integrate="hidden">
+        <assemblyIdentity name="Multimedia-MMECoreBase-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="32D6A2656E7C14E078C57F7BB04740C8CCDC6AFFD014BC8DD6662BD258D8BADB">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package00" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="4DA00D4F1427D2876017AEE3023E023FEECC6E80D56622E6753C352F6D3AC053">
+      <package integrate="hidden">
+        <assemblyIdentity name="Multimedia-AudioCore-Full-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="CD4BC6C2507256C928873689B1A06605BBBC681F13A512BF95E53275306D6183">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package01" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="0923C163D872B3D56AA28BDEA75A1C315DDBCA5EF8F9056B268C5B5AFB057EFF">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Desktop-Required-ClientOnly-Removable-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="462624BA4D215937BD1A9E076317958E1618F9D5D7B1787CF8D3621671E08DD2">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Desktop-Shared-Drivers-Package" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="F29E10709C96F61C6807C6B88917550A1C4A4758F47B7BFBCD1A01BF4C140B8D">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package02" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="E4CB82C6DCEB7BFF420B6A0DB7B66F4804C6A6E960DAB144A864BF9BA3A2E641">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package03" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="454889B9F18CED3B9027824B240A72446773262A04719250B97A46CE8FEDE586">
+      <package integrate="hidden">
+        <assemblyIdentity name="Windows-Defender-Client-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="876e3a9374d8c15b14905ad3d4d63d3c">
+      <package integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package04" version="10.0.20348.3091" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

@@ -1,0 +1,214 @@
+name: Auto Patch Windows 20348 Client ISO
+
+on:
+  schedule:
+    # 每月第二个星期三 18:00 UTC（微软 Patch Tuesday 次日）自动运行
+    - cron: '0 18 8-14 * 3'
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Windows Build Version'
+        required: false
+        default: '20348'
+        type: choice
+        options:
+          - '20348'
+      arch:
+        description: 'Architecture'
+        required: false
+        default: 'x64'
+        type: choice
+        options:
+          - 'x64'
+      lang:
+        description: 'Language'
+        required: false
+        default: 'zh-cn'
+        type: choice
+        options:
+          - 'zh-cn'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate build matrix
+        id: set-matrix
+        run: |
+          CONFIG_FILE=".github/version-config.json"
+          BUILD_FILTER="${{ github.event.inputs.build }}"
+          ARCH_FILTER="${{ github.event.inputs.arch }}"
+          LANG_FILTER="${{ github.event.inputs.lang }}"
+
+          MATRIX=$(jq -c --arg b "$BUILD_FILTER" --arg a "$ARCH_FILTER" --arg l "$LANG_FILTER" '
+            .versions | map(
+              select(
+                ($b == "" or .build == $b) and
+                ($a == "" or .arch == $a) and
+                ($l == "" or .lang == $l)
+              )
+            )
+          ' "$CONFIG_FILE")
+
+          echo "Generated Matrix: $MATRIX"
+          echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
+
+  patch_iso:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.matrix != '{"include":[]}' }}
+    runs-on: windows-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository (Client LCU synthesizer & templates)
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Maximize runner disk space
+        shell: pwsh
+        run: |
+          Write-Host "Free space before cleanup:"
+          Get-PSDrive C | Select-Object Used, Free
+          $dirsToRemove = @(
+            "C:\hostedtoolcache\windows\CodeQL",
+            "C:\Program Files\dotnet\sdk",
+            "C:\Program Files (x86)\Android",
+            "C:\ghcup",
+            "C:\julia*"
+          )
+          foreach ($d in $dirsToRemove) {
+            if (Test-Path $d) {
+              Remove-Item -Path $d -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          Write-Host "Free space after cleanup:"
+          Get-PSDrive C | Select-Object Used, Free
+
+      - name: Clone Win_ISO_Patching_Scripts
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/adavak/Win_ISO_Patching_Scripts.git C:\patcher
+          # Refresh meta4 download links to latest Microsoft monthly LCU / SSU / .NET updates
+          Push-Location C:\patcher
+          if (Test-Path ".\Update-Meta4.ps1") {
+            try {
+              .\Update-Meta4.ps1
+            } catch {
+              Write-Host "Update-Meta4.ps1 warning: $($_.Exception.Message) (using existing meta4)"
+            }
+          }
+          Pop-Location
+
+      - name: Hook 20348 Client LCU Synthesizer into W10UI
+        shell: pwsh
+        run: |
+          $repoDir = "${{ github.workspace }}\repo"
+          & "$repoDir\Patch-W10UI.ps1" `
+            -W10UICmdPath "C:\patcher\W10UI.cmd" `
+            -W10UIIniPath "C:\patcher\W10UI.ini" `
+            -InjectScriptPath "$repoDir\Inject-20348-Client-LCU.ps1" `
+            -TemplateDirPath "$repoDir\ClientTemplates"
+
+      - name: Download Base ISO from Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Force -Path "C:\base_download" | Out-Null
+          gh release download "${{ matrix.tag }}" --repo "${{ github.repository }}" --dir "C:\base_download"
+          Get-ChildItem "C:\base_download"
+
+      - name: Extract and Verify Base ISO
+        shell: pwsh
+        run: |
+          $7z = "C:\patcher\bin\7z.exe"
+          $firstPart = "C:\base_download\${{ matrix.file }}"
+          & $7z x $firstPart "-oC:\patcher" -y
+          $isoPath = "C:\patcher\${{ matrix.iso_name }}"
+          if (-not (Test-Path $isoPath)) {
+            throw "Extracted ISO not found at $isoPath"
+          }
+          $actualHash = (Get-FileHash -Path $isoPath -Algorithm SHA256).Hash.ToLower()
+          $expectedHash = "${{ matrix.sha256 }}".ToLower()
+          Write-Host "Actual SHA256:   $actualHash"
+          Write-Host "Expected SHA256: $expectedHash"
+          if ($actualHash -ne $expectedHash) {
+            throw "SHA256 mismatch for base ISO!"
+          }
+          Remove-Item "C:\base_download" -Recurse -Force
+
+      - name: Download Monthly Updates & Patch 20348 Client ISO
+        shell: cmd
+        working-directory: C:\patcher
+        run: |
+          call Start.cmd ${{ matrix.build }} ${{ matrix.arch }} ${{ matrix.netfx }}
+
+      - name: Prepare Release Artifacts
+        id: artifact
+        shell: pwsh
+        run: |
+          $originalIso = "C:\patcher\${{ matrix.iso_name }}"
+          if (Test-Path $originalIso) {
+            Remove-Item $originalIso -Force
+          }
+          $newIso = Get-ChildItem "C:\patcher\*.iso" | Select-Object -First 1
+          if (-not $newIso) {
+            throw "No patched ISO was generated in C:\patcher!"
+          }
+          $isoName = $newIso.Name
+          $baseName = [System.IO.Path]::GetFileNameWithoutExtension($isoName)
+          $sha256 = (Get-FileHash -Path $newIso.FullName -Algorithm SHA256).Hash.ToLower()
+          $sizeGB = [Math]::Round($newIso.Length / 1GB, 2)
+
+          New-Item -ItemType Directory -Force -Path "C:\release_out" | Out-Null
+          "$sha256  $isoName" | Set-Content -Path "C:\release_out\$baseName.sha256" -Encoding ASCII
+
+          $7z = "C:\patcher\bin\7z.exe"
+          & $7z a -tzip -v1900m -mx0 "C:\release_out\$baseName.zip" $newIso.FullName
+
+          $dateTag = (Get-Date).ToString("yyyy.MM.dd")
+          $releaseTag = "20348_Client_${{ matrix.arch }}_${{ matrix.lang }}_$dateTag"
+
+          echo "iso_name=$isoName" >> $GITHUB_OUTPUT
+          echo "base_name=$baseName" >> $GITHUB_OUTPUT
+          echo "sha256=$sha256" >> $GITHUB_OUTPUT
+          echo "size_gb=$sizeGB" >> $GITHUB_OUTPUT
+          echo "release_tag=$releaseTag" >> $GITHUB_OUTPUT
+
+      - name: Publish Patched ISO to GitHub Releases
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.artifact.outputs.release_tag }}"
+          $isoName = "${{ steps.artifact.outputs.iso_name }}"
+          $sha256 = "${{ steps.artifact.outputs.sha256 }}"
+          $sizeGB = "${{ steps.artifact.outputs.size_gb }}"
+
+          $notes = @"
+          ### Windows 10 / 11 Client Build 20348 (`fe_release`) Monthly Updated ISO
+          - **ISO Filename**: `$isoName`
+          - **Size**: `$sizeGB GB`
+          - **SHA256**: `$sha256`
+          - **Included Editions (`install.wim`)**:
+            1. `Windows 10 企业版 LTSC` (`EnterpriseS`)
+            2. `Windows 10 IoT 企业版 LTSC` (`IoTEnterpriseS`)
+            3. `Windows 10 专业版` (`Professional`)
+            4. `Windows 10 企业版` (`Enterprise`)
+          - **Extraction**: Download all `.zip.001`, `.zip.002`, ... parts into the same folder and extract `.zip.001` with 7-Zip.
+          "@
+
+          $files = Get-ChildItem "C:\release_out\*" | ForEach-Object { $_.FullName }
+          gh release create $tag $files --repo "${{ github.repository }}" --title "$isoName" --notes "$notes"

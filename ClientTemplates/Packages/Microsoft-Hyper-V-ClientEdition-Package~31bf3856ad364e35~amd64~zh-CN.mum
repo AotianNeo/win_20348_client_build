@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0" copyright="Copyright (c) Microsoft Corporation. All Rights Reserved.">
+  <assemblyIdentity name="Microsoft-Hyper-V-ClientEdition-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Hyper-V-ClientEdition-zh-CN" releaseType="Language Pack">
+    <parent disposition="detect">
+      <assemblyIdentity name="Microsoft-Hyper-V-ClientEdition-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+    </parent>
+    <update name="Microsoft-Hyper-V-All" displayName="Hyper-V" description="提供一些帮助创建和运行虚拟机及其资源的服务和管理工具。"></update>
+    <update name="Microsoft-Hyper-V" displayName="Hyper-V 平台" description="提供了可以用来创建和管理虚拟机及其资源的服务。"></update>
+    <update name="Microsoft-Hyper-V-Tools-All" displayName="Hyper-V 管理工具" description="包括用于管理 Hyper-V 的 GUI 和命令行工具。"></update>
+    <update name="Microsoft-Hyper-V-Management-PowerShell" displayName="Windows PowerShell 的 Hyper-V 模块" description="包括用于管理 Hyper-V 的 Windows PowerShell cmdlet。">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-UX-PowerShell-Module-HyperV-Package" version="10.0.20348.3089" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Hyper-V-Hypervisor" displayName="Hyper-V 虚拟机监控程序" description="提供了 Hyper-V 虚拟机监控程序。">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Hyper-V-Hypervisor-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Hyper-V_base" displayName="Hyper-V BASE" description="Hyper-V BASE">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Hyper-V-Package-base-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Hyper-V-Services" displayName="Hyper-V 服务" description="提供了可以用来创建和管理虚拟机及其资源的服务。">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Hyper-V-Services-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Onecore-SPP-VirtualDevice" displayName="继承的激活虚拟设备" description="继承的激活虚拟设备">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Onecore-SPP-VirtualDevice-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="HyperV-Networking-Containers-Package" displayName="Hyper-V 容器网络" description="Hyper-V 容器网络">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-Networking-Containers-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Hyper-V-Management-Clients" displayName="Hyper-V GUI 管理工具" description="包括 Hyper-V 管理器管理单元和虚拟机连接工具。">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-UX-UI-Client-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Hyper-V-Management-Clients-62">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-UX-UI-62-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Microsoft-Hyper-V-Management-Clients-63">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="HyperV-UX-UI-63-Package" version="10.0.20348.2849" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

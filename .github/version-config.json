@@ -1,0 +1,14 @@
+{
+  "versions": [
+    {
+      "build": "20348",
+      "arch": "x64",
+      "lang": "zh-cn",
+      "tag": "Base_20348_Client_X64_ZH-CN",
+      "file": "20348.3089_Client_x64_zh-CN.zip.001",
+      "iso_name": "20348.3089_Client_x64_zh-CN.iso",
+      "sha256": "efa215b3aa9c160c07525664cba5550b0d4e0bf03a8668786ff2cd73c6be4f67",
+      "netfx": "4.8.1"
+    }
+  ]
+}

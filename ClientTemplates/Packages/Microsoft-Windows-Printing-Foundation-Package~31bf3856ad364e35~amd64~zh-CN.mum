@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0" copyright="Copyright (c) Microsoft Corporation. All Rights Reserved.">
+  <assemblyIdentity name="Microsoft-Windows-Printing-Foundation-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Printing-Foundation-zh-CN" releaseType="Language Pack">
+    <parent disposition="detect">
+      <assemblyIdentity name="Microsoft-Windows-Printing-Foundation-Package" version="10.0.20348.1" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+    </parent>
+    <update name="Printing-Foundation-Features" displayName="打印和文件服务" description="在此计算机上启用打印、传真和扫描任务"></update>
+    <update name="Printing-Foundation-InternetPrinting-Client" displayName="Internet 打印客户端" description="使客户端可以使用 HTTP 连接到 Web 打印服务器上的打印机">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Printing-InternetPrinting-Client-Opt-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Printing-Foundation-LPDPrintService" displayName="LPD 打印服务" description="将 Windows 计算机用作 &quot;Line Printer Daemon (LPD)&quot; 与“远程行式打印机”客户端">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Printing-LPDPrintService-Opt-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+    <update name="Printing-Foundation-LPRPortMonitor" displayName="LPR 端口监视器" description="使客户端可以打印至连接到 Unix (或 VAX) 服务器的 TCP/IP 打印机">
+      <package contained="false" integrate="hidden">
+        <assemblyIdentity name="Microsoft-Windows-Printing-LPRPortMonitor-Opt-Package" version="10.0.20348.1" processorArchitecture="amd64" language="zh-CN" buildType="release" publicKeyToken="31bf3856ad364e35" />
+      </package>
+    </update>
+  </package>
+</assembly>

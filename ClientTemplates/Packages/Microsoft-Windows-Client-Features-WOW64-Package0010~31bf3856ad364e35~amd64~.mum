@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity name="Microsoft-Windows-Client-Features-WOW64-Package0010" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" />
+  <package identifier="Microsoft-Windows-Client-Features-WOW64-Package0010" releaseType="Feature Pack">
+    <update name="C17B6AD4E2C5356507EC5CD5675FF13AEA1FBE79F23AC8CFEEB29D75A9AFAF5F">
+      <component>
+        <assemblyIdentity name="microsoft-windows-client-features-wow64-deployment00100" version="10.0.20348.3089" processorArchitecture="amd64" language="neutral" buildType="release" publicKeyToken="31bf3856ad364e35" versionScope="nonSxS" />
+      </component>
+    </update>
+  </package>
+</assembly>
