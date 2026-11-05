@@ -31,3 +31,14 @@ if (Test-Path $W10UIIniPath) {
     [System.IO.File]::WriteAllText($W10UIIniPath, $iniContent, [System.Text.Encoding]::Default)
     Write-Host "[Patch-W10UI] Set ResetBase=0 in $W10UIIniPath"
 }
+
+# 3. Make Start.cmd non-interactive in CI (remove pause / choice prompts)
+$startCmdPath = Join-Path (Split-Path -Parent $W10UICmdPath) "Start.cmd"
+if (Test-Path $startCmdPath) {
+    $startContent = [System.IO.File]::ReadAllText($startCmdPath, [System.Text.Encoding]::Default)
+    $startContent = [regex]::Replace($startContent, '(?mi)^\s*choice\s+/c\s+7\s+/n\s*$', 'rem choice /c 7 /n')
+    $startContent = [regex]::Replace($startContent, '(?mi)^\s*pause\s*$', 'rem pause')
+    [System.IO.File]::WriteAllText($startCmdPath, $startContent, [System.Text.Encoding]::Default)
+    Write-Host "[Patch-W10UI] Made $startCmdPath non-interactive for CI"
+}
+

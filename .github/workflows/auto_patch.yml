@@ -100,11 +100,11 @@ jobs:
         shell: pwsh
         run: |
           git clone --depth 1 https://github.com/adavak/Win_ISO_Patching_Scripts.git C:\patcher
-          # Refresh meta4 download links to latest Microsoft monthly LCU / SSU / .NET updates
+          # Refresh meta4 download links to latest Microsoft monthly LCU / SSU / .NET updates for 20348 x64
           Push-Location C:\patcher
           if (Test-Path ".\Update-Meta4.ps1") {
             try {
-              .\Update-Meta4.ps1
+              .\Update-Meta4.ps1 -Build @("${{ matrix.build }}") -Arch @("${{ matrix.arch }}")
             } catch {
               Write-Host "Update-Meta4.ps1 warning: $($_.Exception.Message) (using existing meta4)"
             }
@@ -150,10 +150,13 @@ jobs:
           Remove-Item "C:\base_download" -Recurse -Force
 
       - name: Download Monthly Updates & Patch 20348 Client ISO
-        shell: cmd
+        shell: pwsh
         working-directory: C:\patcher
         run: |
-          call Start.cmd ${{ matrix.build }} ${{ matrix.arch }} ${{ matrix.netfx }}
+          & cmd /c "(echo 9 & echo 7) | Start.cmd"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Start.cmd failed with exit code $LASTEXITCODE"
+          }
 
       - name: Prepare Release Artifacts
         id: artifact
