@@ -53,7 +53,7 @@ $wimlib = Get-ToolPath "wimlib-imagex.exe" @(
     "$WorkDir\tools\wimlib\wimlib-imagex.exe"
 )
 if (-not $wimlib) {
-    Write-Host "  Installing wimlib via Chocolatey / official zip..."
+    Write-Host "  Installing wimlib from official release zip..."
     $wimZip = Join-Path $tmpDir "wimlib.zip"
     Invoke-WebRequest -Uri "https://wimlib.net/downloads/wimlib-1.14.4-windows-x86_64-bin.zip" -OutFile $wimZip -UseBasicParsing
     Expand-Archive -Path $wimZip -DestinationPath "$WorkDir\tools\wimlib" -Force
@@ -118,8 +118,6 @@ public class OfficialIsoHelper {
     }
 
     public static long FindInstallWimOffsetInIso(HttpClient hc, string url) {
-        // Read UDF / ISO9660 or scan first 16 MB + standard UDF anchor to locate MSWIM\0\0\0 header
-        // First check known LTSC 2021 offset 747874304
         byte[] probe = GetRange(hc, url, 747874304L, 8);
         if (Encoding.ASCII.GetString(probe, 0, 5) == "MSWIM") {
             return 747874304L;
@@ -142,7 +140,6 @@ public class OfficialIsoHelper {
         otBytes = GetRange(hc, url, wimOffset + otOff, otSize);
         byte[] xmlBytes = GetRange(hc, url, wimOffset + xmlOff, xmlSize);
 
-        // Collect all metadata resources (flag 0x02)
         int count = otBytes.Length / 50;
         var metaIndices = new List<int>();
         for (int i = 0; i < count; i++) {
@@ -396,13 +393,13 @@ Write-Host "[2/6] Querying ntriver.org for the latest official Windows Server 20
 $mdxUrl = "https://raw.githubusercontent.com/ntriver-org/ntriver-org-site/main/docs/download-windows-office/windows-server-iso-files-rtm/download-windows-server-2022.mdx"
 $mdxContent = (Invoke-WebRequest -Uri $mdxUrl -UseBasicParsing).Content
 
-$srvRegex = '(?s)\|\s*([a-fA-F0-9]{64})\s*\|\s*`(zh-cn_windows_server_2022_updated_[a-z0-9_]+_x64_dvd_[a-f0-9]+\.iso)`'
+$srvRegex = '(?i)(zh-cn_windows_server_2022_updated_[a-z0-9_]+_x64_dvd_[a-f0-9]+\.iso).*?([a-f0-9]{64})'
 $m = [regex]::Match($mdxContent, $srvRegex)
 if (-not $m.Success) {
     throw "Could not parse latest zh-cn Windows Server 2022 ISO from ntriver.org MDX."
 }
-$srvSha256 = $m.Groups[1].Value.ToLowerInvariant()
-$srvIsoName = $m.Groups[2].Value
+$srvIsoName = $m.Groups[1].Value
+$srvSha256  = $m.Groups[2].Value.ToLowerInvariant()
 Write-Host "  Latest Official Server 2022 ISO : $srvIsoName"
 Write-Host "  Expected Official SHA-256       : $srvSha256"
 
@@ -473,7 +470,7 @@ foreach ($sp in $ltscSearchPaths) {
     }
 }
 
-# Also locate amd64_microsoft-windows-s..enterprises-default_*.manifest in LTSC 2021 WinSxS\Manifests
+# Locate amd64_microsoft-windows-s..enterprises-default_*.manifest in LTSC 2021 WinSxS\Manifests
 $manDirOut = & $wimlib dir $ltscMetaWimPath 1 "--path=/Windows/WinSxS/Manifests" --detailed
 $curPath = ""
 foreach ($line in $manDirOut) {
@@ -500,15 +497,6 @@ if ($LASTEXITCODE -ne 0) { throw "wimlib extract failed on ltsc2021_sparse.wim" 
 # Fetch official Microsoft-Windows-EditionSpecific-Professional-Package.ESD from UUP (download.windowsupdate.com)
 Write-Host "  Fetching official EditionSpecific-Professional-Package.ESD from Microsoft Windows Update via UUP API..."
 $uupId = "d397976e-a38d-48a5-b3a0-7e6a0b3c2b27"
-try {
-    $uupList = Invoke-RestMethod -Uri "https://api.uupdump.net/listid.php?search=19044" -TimeoutSec 20
-    if ($uupList.response.builds) {
-        foreach ($b in $uupList.response.builds.PSObject.Properties) {
-            if ($b.Value.arch -eq "amd64") { $uupId = $b.Value.uuid; break }
-        }
-    }
-} catch { }
-
 $uupGet = Invoke-RestMethod -Uri "https://api.uupdump.net/get.php?id=$uupId&lang=zh-cn&edition=professional" -TimeoutSec 30
 $proEsdUrl = $uupGet.response.files.'microsoft-windows-editionspecific-professional-package.esd'.url
 if (-not $proEsdUrl) { throw "Failed to get official EditionSpecific-Professional-Package.ESD URL from UUP API" }
@@ -521,10 +509,8 @@ if ($LASTEXITCODE -ne 0) { throw "Failed to download EditionSpecific-Pro.esd" }
 if ($LASTEXITCODE -ne 0) { throw "Failed to extract EditionSpecific-Pro.esd" }
 
 # Assemble unified Client Overlay directory (combining Pro ESD + LTSC 2021 official files)
-# 1. Copy LTSC 2021 extracted tree into $clientOverlay first
-Copy-Item -Path "$ltscStaging\Windows" -Destination "$clientOverlay\Windows" -Recurse -Force
+robocopy.exe "$ltscStaging\Windows" "$clientOverlay\Windows" /E /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
 
-# 2. Map SxS component files from EditionSpecific-Pro.esd into $clientOverlay\Windows
 $proSkuMap = @{
     "rofessional-license_" = "Professional"
     "-enterprise-license_" = "Enterprise"
@@ -593,8 +579,11 @@ Set-ItemProperty -Path $origWim -Name IsReadOnly -Value $false
 dism.exe /Mount-Wim /WimFile:$origWim /Index:2 /MountDir:$mountDir /Quiet
 if ($LASTEXITCODE -ne 0) { throw "dism /Mount-Wim failed" }
 
+$hivesEntSBase = Join-Path $tmpDir "SOFTWARE_EntS_Base"
+$hivesProBase  = Join-Path $tmpDir "SOFTWARE_Pro_Base"
+$hiveSysBase   = Join-Path $tmpDir "SYSTEM_Base"
+
 try {
-    # Locate installed Microsoft-Windows-ServerStandardEdition~*.mum in mounted image
     $srvStdMum = Get-ChildItem -Path "$mountDir\Windows\servicing\Packages" -Filter "Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $srvStdMum) { throw "Could not find Microsoft-Windows-ServerStandardEdition.mum in mounted image" }
 
@@ -650,7 +639,7 @@ try {
 Name=$fullPkgId.cat
 ResultDir=$pkgStaging
 PublicVersion=1
- CatalogVersion=2
+CatalogVersion=2
 HashAlgorithms=SHA256
 PageHashes=false
 EncodingType=0x00010001
@@ -662,103 +651,44 @@ CATATTR1=0x10010001:OSAttr:2:6.0
         [IO.File]::WriteAllText($cdfFile, $cdfContent, [Text.Encoding]::ASCII)
         [OfficialIsoHelper]::CreateCatFromCdf($cdfFile)
         Set-AuthenticodeSignature -FilePath $catFile -Certificate $cert -HashAlgorithm SHA256 | Out-Null
-        return @{ MumPath = $mumFile; PackageName = $fullPkgId }
+        return @{ MumPath = $mumFile; CatPath = $catFile; PackageName = $fullPkgId }
     }
 
     $entSPkg = New-ClientProductPackage "EnterpriseS"
     $proPkg  = New-ClientProductPackage "Professional"
 
     function Apply-ClientOverlayFiles {
-        Copy-Item -Path "$clientOverlay\Windows\*" -Destination "$mountDir\Windows" -Recurse -Force
+        # Use robocopy /B (Backup Mode) to bypass TrustedInstaller ACL restrictions on mounted WIM files
+        robocopy.exe "$clientOverlay\Windows" "$mountDir\Windows" /E /B /IS /IT /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
         foreach ($srvSku in @("ServerStandard", "ServerDatacenter")) {
             $srvSkuPath = Join-Path "$mountDir\Windows\System32\spp\tokens\skus" $srvSku
-            if (Test-Path $srvSkuPath) { Remove-Item -Path $srvSkuPath -Recurse -Force }
+            if (Test-Path $srvSkuPath) {
+                takeown.exe /f $srvSkuPath /r /a /d y | Out-Null
+                icacls.exe $srvSkuPath /grant "*S-1-5-32-544:(OI)(CI)F" /t /q | Out-Null
+                Remove-Item -Path $srvSkuPath -Recurse -Force -ErrorAction SilentlyContinue
+            }
         }
-        $srvEdXml1 = Join-Path "$mountDir\Windows\servicing\Editions\ServerStandardEdition.xml"
-        $srvEdXml2 = Join-Path "$mountDir\Windows\servicing\Editions\ServerDatacenterEdition.xml"
-        if (Test-Path $srvEdXml1) { Remove-Item $srvEdXml1 -Force }
-        if (Test-Path $srvEdXml2) { Remove-Item $srvEdXml2 -Force }
-
-        # Disable ServerManager scheduled task
+        foreach ($edXml in @("ServerStandardEdition.xml", "ServerDatacenterEdition.xml")) {
+            $edXmlPath = Join-Path "$mountDir\Windows\servicing\Editions" $edXml
+            if (Test-Path $edXmlPath) {
+                takeown.exe /f $edXmlPath /a | Out-Null
+                icacls.exe $edXmlPath /grant "*S-1-5-32-544:F" /q | Out-Null
+                Remove-Item $edXmlPath -Force -ErrorAction SilentlyContinue
+            }
+        }
         $smTaskPath = "$mountDir\Windows\System32\Tasks\Microsoft\Windows\Server Manager\ServerManager"
         if (Test-Path $smTaskPath) {
+            takeown.exe /f $smTaskPath /a | Out-Null
+            icacls.exe $smTaskPath /grant "*S-1-5-32-544:F" /q | Out-Null
             $taskText = [IO.File]::ReadAllText($smTaskPath)
             $taskText = $taskText -replace '<Enabled>true</Enabled>', '<Enabled>false</Enabled>'
             [IO.File]::WriteAllText($smTaskPath, $taskText, [Text.Encoding]::Unicode)
         }
     }
 
-    function Set-OfflineClientRegistry([string]$editionId, [string]$compEditionId, [string]$productName, [byte[]]$policyBytes, [hashtable]$regMap, [bool]$WriteDefaultKey = $true) {
-        reg.exe load "HKLM\OFFLINE_SYS" "$mountDir\Windows\System32\config\SYSTEM" | Out-Null
-        reg.exe load "HKLM\OFFLINE_SW" "$mountDir\Windows\System32\config\SOFTWARE" | Out-Null
-        try {
-            $poKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SYS\ControlSet001\Control\ProductOptions", $true)
-            $poKey.SetValue("ProductType", "WinNT", [Microsoft.Win32.RegistryValueKind]::String)
-            $poKey.SetValue("ProductSuite", [string[]]@("Terminal Server"), [Microsoft.Win32.RegistryValueKind]::MultiString)
-            $poKey.SetValue("ProductPolicy", $policyBytes, [Microsoft.Win32.RegistryValueKind]::Binary)
-            if ($regMap["OSProductPfn"]) {
-                $poKey.SetValue("OSProductPfn", [string]$regMap["OSProductPfn"], [Microsoft.Win32.RegistryValueKind]::String)
-            }
-            if ($regMap["OSProductContentId"]) {
-                $poKey.SetValue("OSProductContentId", [string]$regMap["OSProductContentId"], [Microsoft.Win32.RegistryValueKind]::String)
-            }
-            $poKey.Close()
-
-            $cvKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SW\Microsoft\Windows NT\CurrentVersion", $true)
-            $cvKey.SetValue("InstallationType", "Client", [Microsoft.Win32.RegistryValueKind]::String)
-            $cvKey.SetValue("EditionID", $editionId, [Microsoft.Win32.RegistryValueKind]::String)
-            $cvKey.SetValue("CompositionEditionID", $compEditionId, [Microsoft.Win32.RegistryValueKind]::String)
-            $cvKey.SetValue("ProductName", $productName, [Microsoft.Win32.RegistryValueKind]::String)
-            if ($WriteDefaultKey) {
-                if ($regMap["ProductId"]) {
-                    $cvKey.SetValue("ProductId", [string]$regMap["ProductId"], [Microsoft.Win32.RegistryValueKind]::String)
-                }
-                if ($regMap["DigitalProductId"]) {
-                    $cvKey.SetValue("DigitalProductId", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-                }
-                if ($regMap["DigitalProductId4"]) {
-                    $cvKey.SetValue("DigitalProductId4", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId4"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-                }
-
-                foreach ($subName in @("DefaultProductKey", "DefaultProductKey2")) {
-                    $dpk = $cvKey.CreateSubKey($subName)
-                    if ($regMap["ProductId"]) {
-                        $dpk.SetValue("ProductId", [string]$regMap["ProductId"], [Microsoft.Win32.RegistryValueKind]::String)
-                    }
-                    if ($regMap["DigitalProductId"]) {
-                        $dpk.SetValue("DigitalProductId", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-                    }
-                    if ($regMap["DigitalProductId4"]) {
-                        $dpk.SetValue("DigitalProductId4", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId4"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-                    }
-                    $dpk.Close()
-                }
-            }
-            $cvKey.Close()
-
-            $smKey = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey("OFFLINE_SW\Microsoft\ServerManager")
-            $smKey.SetValue("DoNotOpenServerManagerAtLogon", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
-            $smKey.Close()
-        } finally {
-            [GC]::Collect()
-            [GC]::WaitForPendingFinalizers()
-            reg.exe unload "HKLM\OFFLINE_SYS" | Out-Null
-            reg.exe unload "HKLM\OFFLINE_SW" | Out-Null
-        }
-    }
-
-    # -----------------------------------------------------------------------
-    # 5. Switch CBS Edition & Capture 4 Client Editions into New install.wim
-    # -----------------------------------------------------------------------
-    Write-Host "[5/6] Switching CBS Edition & capturing 4 Client editions..." -ForegroundColor Yellow
-
-    $newWimPath = Join-Path $WorkDir "install_client.wim"
-    if (Test-Path $newWimPath) { Remove-Item $newWimPath -Force }
-
-    # Pre-stage Client servicing Editions before CBS switch
     Apply-ClientOverlayFiles
 
-    # Switch ServerStandardEdition -> EnterpriseSEdition
+    # Switch CBS Product Package: ServerStandardEdition -> EnterpriseSEdition
     Write-Host "  Installing Microsoft-Windows-EnterpriseSEdition ($pkgVer)..."
     dism.exe /Image:$mountDir /Add-Package /PackagePath:$($entSPkg.MumPath) /Quiet
     if ($LASTEXITCODE -ne 0) { throw "Failed to add EnterpriseSEdition package" }
@@ -769,44 +699,10 @@ CATATTR1=0x10010001:OSAttr:2:6.0
     if ($LASTEXITCODE -ne 0) { throw "Failed to remove ServerStandardEdition package" }
 
     Apply-ClientOverlayFiles
+    Copy-Item "$mountDir\Windows\System32\config\SOFTWARE" $hivesEntSBase -Force
 
-    # Edition 1: EnterpriseS (Windows 10 Enterprise LTSC 2021)
-    Write-Host "  Capturing Index 1: Windows 10 Enterprise LTSC 2021 (EnterpriseS)..." -ForegroundColor Cyan
-    $polEntS = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0x7D)
-    Set-OfflineClientRegistry "EnterpriseS" "EnterpriseS" "Windows 10 Enterprise LTSC 2021" $polEntS $ltscReg $true
-    dism.exe /Image:$mountDir /Set-ProductKey:M7XTQ-FN8P6-TTKYV-9D4CC-J462D /Quiet | Out-Null
-    Set-OfflineClientRegistry "EnterpriseS" "EnterpriseS" "Windows 10 Enterprise LTSC 2021" $polEntS $ltscReg $false
-
-    & $wimlib capture $mountDir $newWimPath "Windows 10 Enterprise LTSC 2021" "Windows 10 Enterprise LTSC 2021" `
-        --compress=LZX `
-        "--image-property=EDITIONID=EnterpriseS" `
-        "--image-property=INSTALLATIONTYPE=Client" `
-        "--image-property=PRODUCTTYPE=WinNT" `
-        "--image-property=PRODUCTSUITE=Terminal Server" `
-        "--image-property=DISPLAYNAME=Windows 10 企业版 LTSC" `
-        "--image-property=DISPLAYDESCRIPTION=Windows 10 企业版 LTSC" `
-        "--image-property=FLAGS=EnterpriseS"
-    if ($LASTEXITCODE -ne 0) { throw "Failed to capture Index 1 (EnterpriseS)" }
-
-    # Edition 2: IoTEnterpriseS (Windows 10 IoT Enterprise LTSC 2021)
-    Write-Host "  Appending Index 2: Windows 10 IoT Enterprise LTSC 2021 (IoTEnterpriseS)..." -ForegroundColor Cyan
-    $polIoT = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0xBD)
-    Set-OfflineClientRegistry "IoTEnterpriseS" "EnterpriseS" "Windows 10 IoT Enterprise LTSC 2021" $polIoT $ltscReg $true
-    dism.exe /Image:$mountDir /Set-ProductKey:QPM6N-7J2WJ-P88HH-P3YRH-YY74H /Quiet | Out-Null
-    Set-OfflineClientRegistry "IoTEnterpriseS" "EnterpriseS" "Windows 10 IoT Enterprise LTSC 2021" $polIoT $ltscReg $false
-
-    & $wimlib append $mountDir $newWimPath "Windows 10 IoT Enterprise LTSC 2021" "Windows 10 IoT Enterprise LTSC 2021" `
-        "--image-property=EDITIONID=IoTEnterpriseS" `
-        "--image-property=INSTALLATIONTYPE=Client" `
-        "--image-property=PRODUCTTYPE=WinNT" `
-        "--image-property=PRODUCTSUITE=Terminal Server" `
-        "--image-property=DISPLAYNAME=Windows 10 IoT 企业版 LTSC" `
-        "--image-property=DISPLAYDESCRIPTION=Windows 10 IoT 企业版 LTSC" `
-        "--image-property=FLAGS=IoTEnterpriseS"
-    if ($LASTEXITCODE -ne 0) { throw "Failed to append Index 2 (IoTEnterpriseS)" }
-
-    # Switch EnterpriseSEdition -> ProfessionalEdition for Index 3 & 4
-    Write-Host "  Switching CBS Product Package: EnterpriseSEdition -> ProfessionalEdition ($pkgVer)..."
+    # Also generate the ProfessionalEdition CBS SOFTWARE hive state
+    Write-Host "  Generating Microsoft-Windows-ProfessionalEdition ($pkgVer) CBS state..."
     dism.exe /Image:$mountDir /Add-Package /PackagePath:$($proPkg.MumPath) /Quiet
     if ($LASTEXITCODE -ne 0) { throw "Failed to add ProfessionalEdition package" }
 
@@ -814,48 +710,179 @@ CATATTR1=0x10010001:OSAttr:2:6.0
     if ($LASTEXITCODE -ne 0) { throw "Failed to remove EnterpriseSEdition package" }
 
     Apply-ClientOverlayFiles
+    Copy-Item "$mountDir\Windows\System32\config\SOFTWARE" $hivesProBase -Force
+    Copy-Item "$mountDir\Windows\System32\config\SYSTEM" $hiveSysBase -Force
 
-    # Edition 3: Professional (Windows 10 Pro)
-    Write-Host "  Appending Index 3: Windows 10 Pro (Professional)..." -ForegroundColor Cyan
-    $polPro = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x30)
-    Set-OfflineClientRegistry "Professional" "Enterprise" "Windows 10 Pro" $polPro $proReg $true
-    dism.exe /Image:$mountDir /Set-ProductKey:W269N-WFGWX-YVC9B-4J6C9-T83GX /Quiet | Out-Null
-    Set-OfflineClientRegistry "Professional" "Enterprise" "Windows 10 Pro" $polPro $proReg $false
+    # Ensure both EnterpriseSEdition and ProfessionalEdition .mum/.cat exist in servicing\Packages & CatRoot
+    Copy-Item $entSPkg.MumPath "$mountDir\Windows\servicing\Packages\" -Force
+    Copy-Item $entSPkg.CatPath "$mountDir\Windows\servicing\Packages\" -Force
+    Copy-Item $entSPkg.CatPath "$mountDir\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\" -Force
+    Copy-Item $proPkg.MumPath  "$mountDir\Windows\servicing\Packages\" -Force
+    Copy-Item $proPkg.CatPath  "$mountDir\Windows\servicing\Packages\" -Force
+    Copy-Item $proPkg.CatPath  "$mountDir\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\" -Force
 
-    & $wimlib append $mountDir $newWimPath "Windows 10 Pro" "Windows 10 Pro" `
-        "--image-property=EDITIONID=Professional" `
-        "--image-property=INSTALLATIONTYPE=Client" `
-        "--image-property=PRODUCTTYPE=WinNT" `
-        "--image-property=PRODUCTSUITE=Terminal Server" `
-        "--image-property=DISPLAYNAME=Windows 10 专业版" `
-        "--image-property=DISPLAYDESCRIPTION=Windows 10 专业版" `
-        "--image-property=FLAGS=Professional"
-    if ($LASTEXITCODE -ne 0) { throw "Failed to append Index 3 (Professional)" }
-
-    # Edition 4: Enterprise (Windows 10 Enterprise)
-    Write-Host "  Appending Index 4: Windows 10 Enterprise (Enterprise)..." -ForegroundColor Cyan
-    $polEnt = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x04)
-    Set-OfflineClientRegistry "Enterprise" "Enterprise" "Windows 10 Enterprise" $polEnt $proReg $true
-    dism.exe /Image:$mountDir /Set-ProductKey:NPPR9-FWDCX-D2C8J-H872K-2YT43 /Quiet | Out-Null
-    Set-OfflineClientRegistry "Enterprise" "Enterprise" "Windows 10 Enterprise" $polEnt $proReg $false
-
-    & $wimlib append $mountDir $newWimPath "Windows 10 Enterprise" "Windows 10 Enterprise" `
-        "--image-property=EDITIONID=Enterprise" `
-        "--image-property=INSTALLATIONTYPE=Client" `
-        "--image-property=PRODUCTTYPE=WinNT" `
-        "--image-property=PRODUCTSUITE=Terminal Server" `
-        "--image-property=DISPLAYNAME=Windows 10 企业版" `
-        "--image-property=DISPLAYDESCRIPTION=Windows 10 企业版" `
-        "--image-property=FLAGS=Enterprise"
-    if ($LASTEXITCODE -ne 0) { throw "Failed to append Index 4 (Enterprise)" }
-
-    & $wimlib optimize $newWimPath
-} finally {
-    Write-Host "  Unmounting working image..."
+    Write-Host "  Committing base Client image changes to WIM..."
+    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit /Quiet
+    if ($LASTEXITCODE -ne 0) { throw "dism /Unmount-Wim /Commit failed" }
+} catch {
     dism.exe /Unmount-Wim /MountDir:$mountDir /Discard /Quiet | Out-Null
+    throw
+} finally {
     Remove-Item "Cert:\LocalMachine\Root\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
     Remove-Item "Cert:\LocalMachine\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
 }
+
+# ---------------------------------------------------------------------------
+# 5. Export 4 Client Editions & Inject Per-Edition Hives via wimlib-imagex
+# ---------------------------------------------------------------------------
+Write-Host "[5/6] Exporting 4 Client editions into unified install.wim..." -ForegroundColor Yellow
+
+function Build-EditionHives([string]$baseSwHive, [string]$baseSysHive, [string]$editionId, [string]$compEditionId, [string]$productName, [byte[]]$policyBytes, [hashtable]$regMap, [string]$outHiveDir) {
+    New-Item -ItemType Directory -Force -Path $outHiveDir | Out-Null
+    $swFile  = Join-Path $outHiveDir "SOFTWARE"
+    $sysFile = Join-Path $outHiveDir "SYSTEM"
+    Copy-Item $baseSwHive  $swFile -Force
+    Copy-Item $baseSysHive $sysFile -Force
+
+    reg.exe load "HKLM\OFFLINE_SYS" $sysFile | Out-Null
+    reg.exe load "HKLM\OFFLINE_SW"  $swFile  | Out-Null
+    try {
+        $poKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SYS\ControlSet001\Control\ProductOptions", $true)
+        $poKey.SetValue("ProductType", "WinNT", [Microsoft.Win32.RegistryValueKind]::String)
+        $poKey.SetValue("ProductSuite", [string[]]@("Terminal Server"), [Microsoft.Win32.RegistryValueKind]::MultiString)
+        $poKey.SetValue("ProductPolicy", $policyBytes, [Microsoft.Win32.RegistryValueKind]::Binary)
+        if ($regMap["OSProductPfn"]) {
+            $poKey.SetValue("OSProductPfn", [string]$regMap["OSProductPfn"], [Microsoft.Win32.RegistryValueKind]::String)
+        }
+        if ($regMap["OSProductContentId"]) {
+            $poKey.SetValue("OSProductContentId", [string]$regMap["OSProductContentId"], [Microsoft.Win32.RegistryValueKind]::String)
+        }
+        $poKey.Close()
+
+        $cvKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SW\Microsoft\Windows NT\CurrentVersion", $true)
+        $cvKey.SetValue("InstallationType", "Client", [Microsoft.Win32.RegistryValueKind]::String)
+        $cvKey.SetValue("EditionID", $editionId, [Microsoft.Win32.RegistryValueKind]::String)
+        $cvKey.SetValue("CompositionEditionID", $compEditionId, [Microsoft.Win32.RegistryValueKind]::String)
+        $cvKey.SetValue("ProductName", $productName, [Microsoft.Win32.RegistryValueKind]::String)
+        if ($regMap["ProductId"]) {
+            $cvKey.SetValue("ProductId", [string]$regMap["ProductId"], [Microsoft.Win32.RegistryValueKind]::String)
+        }
+        if ($regMap["DigitalProductId"]) {
+            $cvKey.SetValue("DigitalProductId", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId"]), [Microsoft.Win32.RegistryValueKind]::Binary)
+        }
+        if ($regMap["DigitalProductId4"]) {
+            $cvKey.SetValue("DigitalProductId4", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId4"]), [Microsoft.Win32.RegistryValueKind]::Binary)
+        }
+
+        foreach ($subName in @("DefaultProductKey", "DefaultProductKey2")) {
+            $dpk = $cvKey.CreateSubKey($subName)
+            if ($regMap["ProductId"]) {
+                $dpk.SetValue("ProductId", [string]$regMap["ProductId"], [Microsoft.Win32.RegistryValueKind]::String)
+            }
+            if ($regMap["DigitalProductId"]) {
+                $dpk.SetValue("DigitalProductId", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId"]), [Microsoft.Win32.RegistryValueKind]::Binary)
+            }
+            if ($regMap["DigitalProductId4"]) {
+                $dpk.SetValue("DigitalProductId4", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId4"]), [Microsoft.Win32.RegistryValueKind]::Binary)
+            }
+            $dpk.Close()
+        }
+        $cvKey.Close()
+
+        $smKey = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey("OFFLINE_SW\Microsoft\ServerManager")
+        $smKey.SetValue("DoNotOpenServerManagerAtLogon", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
+        $smKey.Close()
+    } finally {
+        [GC]::Collect()
+        [GC]::WaitForPendingFinalizers()
+        reg.exe unload "HKLM\OFFLINE_SYS" | Out-Null
+        reg.exe unload "HKLM\OFFLINE_SW"  | Out-Null
+    }
+}
+
+$newWimPath = Join-Path $WorkDir "install_client.wim"
+if (Test-Path $newWimPath) { Remove-Item $newWimPath -Force }
+
+# Export base image (Index 2 of $origWim) to $newWimPath Index 1
+Write-Host "  Exporting base image to new install.wim..."
+& $wimlib export $origWim 2 $newWimPath "Windows 10 Enterprise LTSC 2021" "Windows 10 Enterprise LTSC 2021" --compress=LZX
+if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 1 failed" }
+
+# Instant intra-WIM exports for Indexes 2, 3, 4 (shares 100% of file streams)
+& $wimlib export $newWimPath 1 $newWimPath "Windows 10 IoT Enterprise LTSC 2021" "Windows 10 IoT Enterprise LTSC 2021"
+if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 2 failed" }
+
+& $wimlib export $newWimPath 1 $newWimPath "Windows 10 Pro" "Windows 10 Pro"
+if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 3 failed" }
+
+& $wimlib export $newWimPath 1 $newWimPath "Windows 10 Enterprise" "Windows 10 Enterprise"
+if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 4 failed" }
+
+$editions = @(
+    @{
+        Index = 1
+        EditionId = "EnterpriseS"
+        CompId = "EnterpriseS"
+        Name = "Windows 10 Enterprise LTSC 2021"
+        DisplayName = "Windows 10 企业版 LTSC"
+        BaseSw = $hivesEntSBase
+        Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0x7D)
+        RegMap = $ltscReg
+    },
+    @{
+        Index = 2
+        EditionId = "IoTEnterpriseS"
+        CompId = "EnterpriseS"
+        Name = "Windows 10 IoT Enterprise LTSC 2021"
+        DisplayName = "Windows 10 IoT 企业版 LTSC"
+        BaseSw = $hivesEntSBase
+        Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0xBD)
+        RegMap = $ltscReg
+    },
+    @{
+        Index = 3
+        EditionId = "Professional"
+        CompId = "Enterprise"
+        Name = "Windows 10 Pro"
+        DisplayName = "Windows 10 专业版"
+        BaseSw = $hivesProBase
+        Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x30)
+        RegMap = $proReg
+    },
+    @{
+        Index = 4
+        EditionId = "Enterprise"
+        CompId = "Enterprise"
+        Name = "Windows 10 Enterprise"
+        DisplayName = "Windows 10 企业版"
+        BaseSw = $hivesProBase
+        Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x04)
+        RegMap = $proReg
+    }
+)
+
+foreach ($ed in $editions) {
+    Write-Host "  Configuring Index $($ed.Index): $($ed.Name) ($($ed.EditionId))..." -ForegroundColor Cyan
+    $edHiveDir = Join-Path $tmpDir "hives_$($ed.EditionId)"
+    Build-EditionHives $ed.BaseSw $hiveSysBase $ed.EditionId $ed.CompId $ed.Name $ed.Policy $ed.RegMap $edHiveDir
+
+    & $wimlib update $newWimPath $ed.Index `
+        "--command=add '$edHiveDir\SYSTEM' '\Windows\System32\config\SYSTEM'" `
+        "--command=add '$edHiveDir\SOFTWARE' '\Windows\System32\config\SOFTWARE'"
+    if ($LASTEXITCODE -ne 0) { throw "wimlib update failed for Index $($ed.Index)" }
+
+    & $wimlib info $newWimPath $ed.Index $ed.Name $ed.Name `
+        "--image-property=EDITIONID=$($ed.EditionId)" `
+        "--image-property=INSTALLATIONTYPE=Client" `
+        "--image-property=PRODUCTTYPE=WinNT" `
+        "--image-property=PRODUCTSUITE=Terminal Server" `
+        "--image-property=DISPLAYNAME=$($ed.DisplayName)" `
+        "--image-property=DISPLAYDESCRIPTION=$($ed.DisplayName)" `
+        "--image-property=FLAGS=$($ed.EditionId)"
+    if ($LASTEXITCODE -ne 0) { throw "wimlib info failed for Index $($ed.Index)" }
+}
+
+& $wimlib optimize $newWimPath
 
 # ---------------------------------------------------------------------------
 # 6. Replace install.wim, Write ei.cfg, and Build Bootable Client ISO
@@ -893,7 +920,6 @@ Write-Host " SHA-256    : $isoHash" -ForegroundColor Green
 Write-Host " Version    : $pkgVer" -ForegroundColor Green
 Write-Host "==================================================================" -ForegroundColor Green
 
-# Export build metadata for GitHub Actions release step
 if ($env:GITHUB_OUTPUT) {
     "iso_path=$outIsoPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
     "iso_name=$outIsoName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
