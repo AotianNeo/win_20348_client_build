@@ -7,10 +7,14 @@
       2. Windows 10 IoT Enterprise LTSC 2021 (IoTEnterpriseS)
       3. Windows 10 Pro (Professional)
       4. Windows 10 Enterprise (Enterprise)
-    Official Upstream Sources Only (Zero Third-Party Files):
-      - Official Monthly Updated Windows Server 2022 ISO (via ntriver.org)
-      - Official Windows 10 Enterprise LTSC 2021 ISO (via ntriver.org HTTP Range Sparse WIM Extraction)
-      - Official Microsoft UUP EditionSpecific-Professional-Package.ESD (via download.windowsupdate.com)
+    Features Included:
+      - Full Client CBS Packages & WinSxS Components (EnterpriseS + Professional/Enterprise)
+      - 71 Client-Only Hardware Drivers Registered in DRIVERS & SYSTEM Hives:
+          * 12 Intel/AMD Serial IO I2C & GPIO Touchpad Host Controller Drivers
+          * 7 Bluetooth Audio Profile Drivers (A2DP Sink/Source, AVRCP Transport, HFP Hands-Free/Audio Gateway)
+          * 44 Desktop Wireless Wi-Fi Network Adapters (Intel/Realtek/Qualcomm/Broadcom) & 4 Xbox GIP/HID Drivers
+      - 99 Client Services & Svchost Service Groups (BthAvctpSvc, BTAGService, BluetoothUserService, XboxGipSvc, etc.)
+      - Default Pre-Enabled .NET Framework 3.5 (NetFx3) from Official ISO sources\sxs CAB
 #>
 param(
     [string]$WorkDir = "$PSScriptRoot\work",
@@ -21,7 +25,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host " Windows 20348 Client ISO Builder (100% Official Microsoft Files)" -ForegroundColor Cyan
+Write-Host " Windows 20348 Client ISO Builder (Full Client Packages & Drivers)" -ForegroundColor Cyan
 Write-Host "==================================================================" -ForegroundColor Cyan
 
 New-Item -ItemType Directory -Force -Path $WorkDir, $OutputDir | Out-Null
@@ -32,7 +36,9 @@ $clientOverlay = Join-Path $WorkDir "client_overlay"
 $isoExtractDir = Join-Path $WorkDir "iso_root"
 $mountDir = Join-Path $WorkDir "mount"
 $pkgStaging = Join-Path $WorkDir "synth_pkgs"
-New-Item -ItemType Directory -Force -Path $tmpDir, $ltscStaging, $proStaging, $clientOverlay, $isoExtractDir, $mountDir, $pkgStaging | Out-Null
+$payloadEntSDir = Join-Path $WorkDir "payload_entS"
+$payloadProExtraDir = Join-Path $WorkDir "payload_pro_extra"
+New-Item -ItemType Directory -Force -Path $tmpDir, $ltscStaging, $proStaging, $clientOverlay, $isoExtractDir, $mountDir, $pkgStaging, $payloadEntSDir, $payloadProExtraDir | Out-Null
 
 # ---------------------------------------------------------------------------
 # 0. Ensure Required CLI Tools (wimlib-imagex, aria2c, 7z, oscdimg)
@@ -87,248 +93,15 @@ Write-Host "  7z     : $sevenZip"
 Write-Host "  oscdimg: $oscdimg"
 
 # ---------------------------------------------------------------------------
-# 1. Compile Embedded C# Helpers (WIM Sparse Range Builder, SxS Delta, CatCreator, PolicyPatcher)
+# 1. Compile Embedded C# Helpers (Hex & ProductPolicy SKU Patcher)
 # ---------------------------------------------------------------------------
 Write-Host "[1/6] Compiling embedded C# helpers..." -ForegroundColor Yellow
 
 Add-Type -TypeDefinition @'
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Runtime.InteropServices;
 using System.Text;
 
 public class OfficialIsoHelper {
-    public static byte[] GetRange(HttpClient hc, string url, long offset, long length) {
-        for (int attempt = 0; attempt < 5; attempt++) {
-            try {
-                var req = new HttpRequestMessage(HttpMethod.Get, url);
-                req.Headers.Range = new RangeHeaderValue(offset, offset + length - 1);
-                var resp = hc.SendAsync(req).GetAwaiter().GetResult();
-                resp.EnsureSuccessStatusCode();
-                return resp.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-            } catch {
-                if (attempt == 4) throw;
-                System.Threading.Thread.Sleep(1000 * (attempt + 1));
-            }
-        }
-        return null;
-    }
-
-    public static long FindInstallWimOffsetInIso(HttpClient hc, string url) {
-        byte[] probe = GetRange(hc, url, 747874304L, 8);
-        if (Encoding.ASCII.GetString(probe, 0, 5) == "MSWIM") {
-            return 747874304L;
-        }
-        throw new Exception("Unexpected WIM offset in ISO");
-    }
-
-    public static byte[] BuildMetadataWim(HttpClient hc, string url, long wimOffset, out byte[] otBytes) {
-        byte[] wimHdr = GetRange(hc, url, wimOffset, 208);
-        if (Encoding.ASCII.GetString(wimHdr, 0, 5) != "MSWIM")
-            throw new Exception("Invalid WIM header at offset " + wimOffset);
-
-        long otSize = (long)(BitConverter.ToUInt64(wimHdr, 48) & 0x00FFFFFFFFFFFFFFUL);
-        long otOff  = BitConverter.ToInt64(wimHdr, 56);
-        long xmlSize = (long)(BitConverter.ToUInt64(wimHdr, 72) & 0x00FFFFFFFFFFFFFFUL);
-        long xmlOff  = BitConverter.ToInt64(wimHdr, 80);
-        long bootSize = (long)(BitConverter.ToUInt64(wimHdr, 96) & 0x00FFFFFFFFFFFFFFUL);
-        long bootOff  = BitConverter.ToInt64(wimHdr, 104);
-
-        otBytes = GetRange(hc, url, wimOffset + otOff, otSize);
-        byte[] xmlBytes = GetRange(hc, url, wimOffset + xmlOff, xmlSize);
-
-        int count = otBytes.Length / 50;
-        var metaIndices = new List<int>();
-        for (int i = 0; i < count; i++) {
-            byte flags = otBytes[i * 50 + 7];
-            if ((flags & 0x02) != 0) {
-                metaIndices.Add(i);
-            }
-        }
-
-        using (var ms = new MemoryStream()) {
-            ms.Write(wimHdr, 0, 208);
-            byte[] newOt = new byte[metaIndices.Count * 50];
-            for (int idx = 0; idx < metaIndices.Count; idx++) {
-                int i = metaIndices[idx];
-                int eo = i * 50;
-                long rSize = (long)(BitConverter.ToUInt64(otBytes, eo) & 0x00FFFFFFFFFFFFFFUL);
-                long rOff  = BitConverter.ToInt64(otBytes, eo + 8);
-                byte[] data = GetRange(hc, url, wimOffset + rOff, rSize);
-                long newOff = ms.Position;
-                ms.Write(data, 0, data.Length);
-                Buffer.BlockCopy(otBytes, eo, newOt, idx * 50, 50);
-                Buffer.BlockCopy(BitConverter.GetBytes(newOff), 0, newOt, idx * 50 + 8, 8);
-                if (rOff == bootOff && rSize == bootSize) {
-                    ulong bRaw = (((ulong)otBytes[eo + 7]) << 56) | (ulong)rSize;
-                    Buffer.BlockCopy(BitConverter.GetBytes(bRaw), 0, wimHdr, 96, 8);
-                    Buffer.BlockCopy(BitConverter.GetBytes(newOff), 0, wimHdr, 104, 8);
-                    Buffer.BlockCopy(otBytes, eo + 16, wimHdr, 112, 8);
-                }
-            }
-            long newOtOff = ms.Position;
-            ms.Write(newOt, 0, newOt.Length);
-            long newXmlOff = ms.Position;
-            ms.Write(xmlBytes, 0, xmlBytes.Length);
-
-            byte[] outBytes = ms.ToArray();
-            ulong otRaw = (0x02UL << 56) | (uint)newOt.Length;
-            Buffer.BlockCopy(BitConverter.GetBytes(otRaw), 0, outBytes, 48, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes(newOtOff), 0, outBytes, 56, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes((long)newOt.Length), 0, outBytes, 64, 8);
-
-            ulong xmlRaw = (0x02UL << 56) | (uint)xmlBytes.Length;
-            Buffer.BlockCopy(BitConverter.GetBytes(xmlRaw), 0, outBytes, 72, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes(newXmlOff), 0, outBytes, 80, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes((long)xmlBytes.Length), 0, outBytes, 88, 8);
-
-            Buffer.BlockCopy(wimHdr, 96, outBytes, 96, 24);
-            Array.Clear(outBytes, 128, 24);
-            return outBytes;
-        }
-    }
-
-    private class ResItem {
-        public int Index;
-        public long Offset;
-        public long Size;
-    }
-
-    public static byte[] BuildSparseWim(HttpClient hc, string url, long wimOffset, byte[] metaWimBytes, byte[] fullOtBytes, HashSet<string> targetHashes) {
-        long metaOtSize = (long)(BitConverter.ToUInt64(metaWimBytes, 48) & 0x00FFFFFFFFFFFFFFUL);
-        long metaOtOff  = BitConverter.ToInt64(metaWimBytes, 56);
-        long metaXmlSize = (long)(BitConverter.ToUInt64(metaWimBytes, 72) & 0x00FFFFFFFFFFFFFFUL);
-        long metaXmlOff  = BitConverter.ToInt64(metaWimBytes, 80);
-
-        byte[] metaOt = new byte[metaOtSize];
-        Buffer.BlockCopy(metaWimBytes, (int)metaOtOff, metaOt, 0, (int)metaOtSize);
-        byte[] xmlBytes = new byte[metaXmlSize];
-        Buffer.BlockCopy(metaWimBytes, (int)metaXmlOff, xmlBytes, 0, (int)metaXmlSize);
-
-        var matched = new List<ResItem>();
-        int count = fullOtBytes.Length / 50;
-        for (int i = 0; i < count; i++) {
-            int eo = i * 50;
-            byte flags = fullOtBytes[eo + 7];
-            if ((flags & 0x02) != 0) continue;
-            var sb = new StringBuilder(40);
-            for (int b = 0; b < 20; b++) sb.Append(fullOtBytes[eo + 30 + b].ToString("x2"));
-            if (targetHashes.Contains(sb.ToString())) {
-                long rSize = (long)(BitConverter.ToUInt64(fullOtBytes, eo) & 0x00FFFFFFFFFFFFFFUL);
-                long rOff  = BitConverter.ToInt64(fullOtBytes, eo + 8);
-                matched.Add(new ResItem { Index = i, Offset = rOff, Size = rSize });
-            }
-        }
-        matched.Sort((a, b) => a.Offset.CompareTo(b.Offset));
-
-        using (var ms = new MemoryStream()) {
-            ms.Write(metaWimBytes, 0, (int)metaOtOff);
-            var newOtList = new List<byte>();
-            newOtList.AddRange(metaOt);
-
-            int idx = 0;
-            while (idx < matched.Count) {
-                int endIdx = idx;
-                long batchStart = matched[idx].Offset;
-                long batchEnd = matched[idx].Offset + matched[idx].Size;
-                while (endIdx + 1 < matched.Count) {
-                    long nextStart = matched[endIdx + 1].Offset;
-                    long nextEnd = nextStart + matched[endIdx + 1].Size;
-                    if ((nextStart - batchEnd) <= 65536 && (nextEnd - batchStart) <= 8 * 1024 * 1024) {
-                        endIdx++;
-                        batchEnd = nextEnd;
-                    } else break;
-                }
-                byte[] batchBytes = GetRange(hc, url, wimOffset + batchStart, batchEnd - batchStart);
-                for (int k = idx; k <= endIdx; k++) {
-                    var item = matched[k];
-                    long newOff = ms.Position;
-                    ms.Write(batchBytes, (int)(item.Offset - batchStart), (int)item.Size);
-                    byte[] entry = new byte[50];
-                    Buffer.BlockCopy(fullOtBytes, item.Index * 50, entry, 0, 50);
-                    Buffer.BlockCopy(BitConverter.GetBytes(newOff), 0, entry, 8, 8);
-                    newOtList.AddRange(entry);
-                }
-                idx = endIdx + 1;
-            }
-
-            long finalOtOff = ms.Position;
-            byte[] finalOt = newOtList.ToArray();
-            ms.Write(finalOt, 0, finalOt.Length);
-            long finalXmlOff = ms.Position;
-            ms.Write(xmlBytes, 0, xmlBytes.Length);
-
-            byte[] outBytes = ms.ToArray();
-            ulong otRaw = (0x02UL << 56) | (uint)finalOt.Length;
-            Buffer.BlockCopy(BitConverter.GetBytes(otRaw), 0, outBytes, 48, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes(finalOtOff), 0, outBytes, 56, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes((long)finalOt.Length), 0, outBytes, 64, 8);
-
-            ulong xmlRaw = (0x02UL << 56) | (uint)xmlBytes.Length;
-            Buffer.BlockCopy(BitConverter.GetBytes(xmlRaw), 0, outBytes, 72, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes(finalXmlOff), 0, outBytes, 80, 8);
-            Buffer.BlockCopy(BitConverter.GetBytes((long)xmlBytes.Length), 0, outBytes, 88, 8);
-            return outBytes;
-        }
-    }
-
-    // SxS Manifest Decompression via msdelta.dll + wcp.dll dictionary
-    [StructLayout(LayoutKind.Sequential)]
-    public struct DELTA_INPUT { public IntPtr lpcStart; public UIntPtr uSize; public int Editable; }
-    [StructLayout(LayoutKind.Sequential)]
-    public struct DELTA_OUTPUT { public IntPtr lpStart; public UIntPtr uSize; }
-    [DllImport("msdelta.dll", SetLastError = true)]
-    public static extern bool ApplyDeltaB(long f, DELTA_INPUT s, DELTA_INPUT d, out DELTA_OUTPUT o);
-    [DllImport("msdelta.dll", SetLastError = true)]
-    public static extern bool DeltaFree(IntPtr lpMemory);
-
-    public static byte[] ExtractWcpDictionary(string wcpDllPath) {
-        byte[] wcpBytes = File.ReadAllBytes(wcpDllPath);
-        byte[] pat = Encoding.ASCII.GetBytes("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<assembly");
-        for (int i = 0; i < wcpBytes.Length - pat.Length; i++) {
-            if (wcpBytes[i] == pat[0] && wcpBytes[i + 1] == pat[1]) {
-                bool match = true;
-                for (int j = 0; j < pat.Length; j++) {
-                    if (wcpBytes[i + j] != pat[j]) { match = false; break; }
-                }
-                if (match) {
-                    byte[] dict = new byte[9066];
-                    Buffer.BlockCopy(wcpBytes, i, dict, 0, 9066);
-                    return dict;
-                }
-            }
-        }
-        throw new Exception("Could not locate SxS XML dictionary in " + wcpDllPath);
-    }
-
-    public static string DecompressManifestXml(byte[] dict, string manifestPath) {
-        byte[] b = File.ReadAllBytes(manifestPath);
-        if (b.Length > 4 && b[0] == 0x44 && b[1] == 0x43 && b[2] == 0x4D && b[3] == 0x01) {
-            byte[] d = new byte[b.Length - 4];
-            Buffer.BlockCopy(b, 4, d, 0, d.Length);
-            GCHandle hs = GCHandle.Alloc(dict, GCHandleType.Pinned);
-            GCHandle hd = GCHandle.Alloc(d, GCHandleType.Pinned);
-            try {
-                var ds = new DELTA_INPUT { lpcStart = hs.AddrOfPinnedObject(), uSize = (UIntPtr)dict.Length };
-                var dd = new DELTA_INPUT { lpcStart = hd.AddrOfPinnedObject(), uSize = (UIntPtr)d.Length };
-                DELTA_OUTPUT o;
-                if (!ApplyDeltaB(0, ds, dd, out o))
-                    throw new Exception("ApplyDeltaB failed with error " + Marshal.GetLastWin32Error());
-                byte[] res = new byte[(int)o.uSize];
-                Marshal.Copy(o.lpStart, res, 0, res.Length);
-                DeltaFree(o.lpStart);
-                return Encoding.UTF8.GetString(res).TrimStart('\uFEFF');
-            } finally {
-                hs.Free();
-                hd.Free();
-            }
-        }
-        return Encoding.UTF8.GetString(b).TrimStart('\uFEFF');
-    }
-
     public static byte[] HexToBytes(string hex) {
         byte[] bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++) {
@@ -355,32 +128,6 @@ public class OfficialIsoHelper {
             pos += entrySize;
         }
         return b;
-    }
-
-    // Security Catalog (.cat) Generator via mscat32.dll
-    [DllImport("mscat32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern IntPtr CryptCATCDFOpen(string pwszFilePath, IntPtr pfnParseError);
-    [DllImport("mscat32.dll", SetLastError = true)]
-    public static extern bool CryptCATCDFClose(IntPtr pCDF);
-    [DllImport("mscat32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern IntPtr CryptCATCDFEnumMembersByCDFTagEx(IntPtr pCDF, IntPtr pwszPrevCDFTag, IntPtr pfnParseError, ref IntPtr ppMember, bool fContinueOnError, IntPtr pvReserved);
-    [DllImport("mscat32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern bool CryptCATCDFEnumAttributesWithCDFTag(IntPtr pCDF, IntPtr pwszMemberTag, IntPtr pMember, IntPtr pPrevAttr, IntPtr pfnParseError);
-    [DllImport("mscat32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern IntPtr CryptCATCDFEnumCatAttributes(IntPtr pCDF, IntPtr pPrevAttr, IntPtr pfnParseError);
-
-    public static void CreateCatFromCdf(string cdfPath) {
-        IntPtr cdf = CryptCATCDFOpen(cdfPath, IntPtr.Zero);
-        if (cdf == IntPtr.Zero) throw new Exception("CryptCATCDFOpen failed: " + Marshal.GetLastWin32Error());
-        try {
-            IntPtr prevAttr = IntPtr.Zero;
-            while ((prevAttr = CryptCATCDFEnumCatAttributes(cdf, prevAttr, IntPtr.Zero)) != IntPtr.Zero) { }
-            IntPtr prevTag = IntPtr.Zero;
-            IntPtr pMember = IntPtr.Zero;
-            while ((prevTag = CryptCATCDFEnumMembersByCDFTagEx(cdf, prevTag, IntPtr.Zero, ref pMember, true, IntPtr.Zero)) != IntPtr.Zero) { }
-        } finally {
-            CryptCATCDFClose(cdf);
-        }
     }
 }
 '@
@@ -421,9 +168,9 @@ if ($actualSha256 -ne $srvSha256) {
 Write-Host "  Verified SHA-256: $actualSha256 [OK]" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 3. Load Official LTSC 2021 & Pro Assets from OfficialClientFiles
+# 3. Load Official Client Assets, Registry Exports & ClientPayload_20348.esd
 # ---------------------------------------------------------------------------
-Write-Host "[3/6] Loading official Client SKU tokens, Editions, Branding & ProductPolicy..." -ForegroundColor Yellow
+Write-Host "[3/6] Loading official Client SKU tokens, Registry Hives & ClientPayload_20348.esd..." -ForegroundColor Yellow
 
 $repoOfficialDir = Join-Path $PSScriptRoot "OfficialClientFiles"
 if (Test-Path $repoOfficialDir) {
@@ -434,6 +181,30 @@ if (Test-Path $repoOfficialDir) {
 } else {
     throw "OfficialClientFiles directory not found at $repoOfficialDir"
 }
+
+$regDir = Join-Path $repoOfficialDir "Registry"
+$regDriversFile  = Join-Path $regDir "ClientDrivers_DRIVERS.reg"
+$regSysFile      = Join-Path $regDir "ClientDriversAndServices_SYSTEM.reg"
+$regSwBaseFile   = Join-Path $regDir "ClientCbsAndSvchost_Base_SOFTWARE.reg"
+$regSwProExtFile = Join-Path $regDir "ClientCbs_ProExtra_SOFTWARE.reg"
+
+foreach ($rf in @($regDriversFile, $regSysFile, $regSwBaseFile, $regSwProExtFile)) {
+    if (-not (Test-Path $rf)) { throw "Required registry file missing: $rf" }
+}
+
+$payloadEsdUrl = "https://github.com/AotianNeo/win_20348_client_build/releases/download/v20348.1-client-payload/ClientPayload_20348.esd"
+$payloadEsdPath = Join-Path $WorkDir "ClientPayload_20348.esd"
+if (-not (Test-Path $payloadEsdPath)) {
+    Write-Host "  Downloading ClientPayload_20348.esd (~230 MB Solid LZMS)..." -ForegroundColor Cyan
+    & $aria2c -x16 -s16 -k1M --file-allocation=none --console-log-level=warn -d $WorkDir -o "ClientPayload_20348.esd" $payloadEsdUrl
+    if ($LASTEXITCODE -ne 0) { throw "Failed to download ClientPayload_20348.esd" }
+}
+
+Write-Host "  Extracting ClientPayload_20348.esd Image 1 (EnterpriseS Base Client Payload) & Image 2 (Pro/Enterprise Extra Payload)..." -ForegroundColor Cyan
+& $wimlib apply $payloadEsdPath 1 $payloadEntSDir --no-acls | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "wimlib apply Image 1 of ClientPayload_20348.esd failed" }
+& $wimlib apply $payloadEsdPath 2 $payloadProExtraDir --no-acls | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "wimlib apply Image 2 of ClientPayload_20348.esd failed" }
 
 function Get-ManifestRegMap([xml]$xmlDoc) {
     $map = @{}
@@ -453,9 +224,9 @@ $proPolicyBytes  = [OfficialIsoHelper]::HexToBytes($proReg["ProductPolicy"])
 Write-Host "  Loaded official EnterpriseS Policy ($($ltscPolicyBytes.Length) bytes) & Enterprise/Pro Policy ($($proPolicyBytes.Length) bytes)" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 4. Extract Official Server 2022 ISO & Prepare Base WIM via wimlib-imagex
+# 4. Extract Official Server 2022 ISO, Enable .NET Framework 3.5 & Extract Base Hives
 # ---------------------------------------------------------------------------
-Write-Host "[4/6] Extracting official Server 2022 ISO and preparing base Client WIM..." -ForegroundColor Yellow
+Write-Host "[4/6] Extracting official Server 2022 ISO, enabling .NET Framework 3.5 (NetFx3), and preparing base WIM..." -ForegroundColor Yellow
 
 & $sevenZip x $srvIsoPath "-o$isoExtractDir" -y | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "7z failed to extract Server 2022 ISO" }
@@ -463,18 +234,41 @@ if ($LASTEXITCODE -ne 0) { throw "7z failed to extract Server 2022 ISO" }
 $origWim = Join-Path $isoExtractDir "sources\install.wim"
 Set-ItemProperty -Path $origWim -Name IsReadOnly -Value $false
 
+$newWimPath = Join-Path $WorkDir "install_client.wim"
+if (Test-Path $newWimPath) { Remove-Item $newWimPath -Force }
+
+# Export base image (Index 2 of $origWim = ServerStandard Desktop Experience) to $newWimPath Index 1
+Write-Host "  Exporting Server 2022 Desktop Experience (Index 2) to new install.wim Index 1..."
+& $wimlib export $origWim 2 $newWimPath "Windows 10 Enterprise LTSC 2021" "Windows 10 Enterprise LTSC 2021"
+if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 1 failed" }
+
+# Pre-enable .NET Framework 3.5 (NetFx3) natively via DISM using official ISO sources\sxs before Client conversion
+$sxsDir = Join-Path $isoExtractDir "sources\sxs"
+Write-Host "  Mounting base image and enabling .NET Framework 3.5 (NetFx3) from $sxsDir..." -ForegroundColor Cyan
+dism.exe /Mount-Wim /WimFile:$newWimPath /Index:1 /MountDir:$mountDir | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "DISM Mount-Wim failed" }
+try {
+    dism.exe /Image:$mountDir /Enable-Feature /FeatureName:NetFx3 /All /LimitAccess /Source:$sxsDir | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "DISM Enable-Feature NetFx3 failed" }
+    Write-Host "  Successfully enabled .NET Framework 3.5 (NetFx3) [OK]" -ForegroundColor Green
+} finally {
+    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "DISM Unmount-Wim Commit failed" }
+}
+
 $hivesExtractDir = Join-Path $tmpDir "orig_hives"
 New-Item -ItemType Directory -Force -Path $hivesExtractDir | Out-Null
 
-& $wimlib extract $origWim 2 `
+& $wimlib extract $newWimPath 1 `
     "\Windows\System32\config\SYSTEM" `
     "\Windows\System32\config\SOFTWARE" `
+    "\Windows\System32\config\DRIVERS" `
     "\Windows\servicing\Packages\Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" `
     "--dest-dir=$hivesExtractDir" "--no-acls" "--nullglob" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "wimlib extract of base hives and ServerStandardEdition.mum failed" }
 
 $srvStdMum = Get-ChildItem -Path $hivesExtractDir -Filter "Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $srvStdMum) { throw "Could not find Microsoft-Windows-ServerStandardEdition.mum in Index 2" }
+if (-not $srvStdMum) { throw "Could not find Microsoft-Windows-ServerStandardEdition.mum in Index 1" }
 
 if ($srvStdMum.Name -match '~~([0-9\.]+)\.mum$') {
     $pkgVer = $matches[1]
@@ -491,13 +285,38 @@ $matrixText = $matrixText -replace 'version="10\.0\.[0-9\.]+"', "version=`"$pkgV
 
 $hiveSysBase = Join-Path $hivesExtractDir "SYSTEM"
 $hiveSwBase  = Join-Path $hivesExtractDir "SOFTWARE"
+$hiveDrvBase = Join-Path $hivesExtractDir "DRIVERS"
+
+# Inject 71 Client Drivers & 99 Client Services into base DRIVERS and SYSTEM hives once
+Write-Host "  Registering 71 Client Drivers (Touchpad I2C/GPIO, Bluetooth Audio A2DP/AVRCP/HFP, Wi-Fi, Xbox) & 99 Services into base DRIVERS & SYSTEM hives..." -ForegroundColor Cyan
+reg.exe load "HKLM\OFFLINE_DRV" $hiveDrvBase | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "reg load OFFLINE_DRV failed" }
+try {
+    reg.exe import $regDriversFile | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "reg import ClientDrivers_DRIVERS.reg failed" }
+} finally {
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+    reg.exe unload "HKLM\OFFLINE_DRV" | Out-Null
+}
+
+reg.exe load "HKLM\OFFLINE_SYS" $hiveSysBase | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "reg load OFFLINE_SYS failed" }
+try {
+    reg.exe import $regSysFile | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "reg import ClientDriversAndServices_SYSTEM.reg failed" }
+} finally {
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+    reg.exe unload "HKLM\OFFLINE_SYS" | Out-Null
+}
 
 # ---------------------------------------------------------------------------
-# 5. Export 4 Client Editions & Inject Per-Edition Hives via wimlib-imagex
+# 5. Export 4 Client Editions & Inject Per-Edition Payloads/Hives via wimlib-imagex
 # ---------------------------------------------------------------------------
-Write-Host "[5/6] Exporting 4 Client editions into unified install.wim..." -ForegroundColor Yellow
+Write-Host "[5/6] Injecting Client payloads and exporting 4 Client editions into unified install.wim..." -ForegroundColor Yellow
 
-function Build-EditionHives([string]$baseSwHive, [string]$baseSysHive, [string]$editionId, [string]$compEditionId, [string]$productName, [byte[]]$policyBytes, [hashtable]$regMap, [string]$outHiveDir) {
+function Build-EditionHives([string]$baseSwHive, [string]$baseSysHive, [string]$editionId, [string]$compEditionId, [string]$productName, [byte[]]$policyBytes, [hashtable]$regMap, [bool]$includeProExtraCbs, [string]$outHiveDir) {
     New-Item -ItemType Directory -Force -Path $outHiveDir | Out-Null
     $swFile  = Join-Path $outHiveDir "SOFTWARE"
     $sysFile = Join-Path $outHiveDir "SYSTEM"
@@ -507,6 +326,25 @@ function Build-EditionHives([string]$baseSwHive, [string]$baseSysHive, [string]$
     reg.exe load "HKLM\OFFLINE_SYS" $sysFile | Out-Null
     reg.exe load "HKLM\OFFLINE_SW"  $swFile  | Out-Null
     try {
+        # Import Client CBS Packages & Svchost Groups into SOFTWARE hive
+        reg.exe import $regSwBaseFile | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "reg import ClientCbsAndSvchost_Base_SOFTWARE.reg failed" }
+        if ($includeProExtraCbs) {
+            reg.exe import $regSwProExtFile | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "reg import ClientCbs_ProExtra_SOFTWARE.reg failed" }
+        }
+
+        # Remove ServerStandardEdition & ServerDatacenterEdition from CBS\Packages so Edition correlates cleanly as Client
+        $cbsPkgsKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SW\Microsoft\Windows\CurrentVersion\Component Based Servicing\Packages", $true)
+        if ($cbsPkgsKey) {
+            foreach ($sub in $cbsPkgsKey.GetSubKeyNames()) {
+                if ($sub -like "Microsoft-Windows-Server*Edition~*") {
+                    $cbsPkgsKey.DeleteSubKeyTree($sub, $false)
+                }
+            }
+            $cbsPkgsKey.Close()
+        }
+
         $poKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SYS\ControlSet001\Control\ProductOptions", $true)
         $poKey.SetValue("ProductType", "WinNT", [Microsoft.Win32.RegistryValueKind]::String)
         $poKey.SetValue("ProductSuite", [string[]]@("Terminal Server"), [Microsoft.Win32.RegistryValueKind]::MultiString)
@@ -560,17 +398,12 @@ function Build-EditionHives([string]$baseSwHive, [string]$baseSysHive, [string]$
     }
 }
 
-$newWimPath = Join-Path $WorkDir "install_client.wim"
-if (Test-Path $newWimPath) { Remove-Item $newWimPath -Force }
-
-# Export base image (Index 2 of $origWim) to $newWimPath Index 1
-Write-Host "  Exporting base image to new install.wim..."
-& $wimlib export $origWim 2 $newWimPath "Windows 10 Enterprise LTSC 2021" "Windows 10 Enterprise LTSC 2021"
-if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 1 failed" }
-
-# Apply official Client overlay files + remove Server SKUs and Server Manager once on Index 1 before cloning Indexes 2-4
+# Apply ClientPayload_20348.esd Image 1 + OfficialClientFiles overlay + updated DRIVERS hive + remove Server SKUs and Server Manager once on Index 1
+Write-Host "  Applying base Client payload (WinSxS, DriverStore, System32, servicing\Packages, DRIVERS hive) to Index 1..." -ForegroundColor Cyan
 $baseOverlayCmds = @"
+add '$payloadEntSDir' '\'
 add '$clientOverlay\Windows' '\Windows'
+add '$hiveDrvBase' '\Windows\System32\config\DRIVERS'
 delete --force --recursive '\Windows\System32\spp\tokens\skus\ServerStandard'
 delete --force --recursive '\Windows\System32\spp\tokens\skus\ServerDatacenter'
 delete --force '\Windows\servicing\Editions\ServerStandardEdition.xml'
@@ -591,7 +424,15 @@ if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 2 failed" }
 & $wimlib export $newWimPath 1 $newWimPath "Windows 10 Pro" "Windows 10 Pro"
 if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 3 failed" }
 
-& $wimlib export $newWimPath 1 $newWimPath "Windows 10 Enterprise" "Windows 10 Enterprise"
+# Apply Pro/Enterprise extra payload to Index 3 before cloning Index 4 so Index 3 & 4 share single-instance streams
+Write-Host "  Applying Pro/Enterprise extra Client payload to Index 3 (and sharing with Index 4)..." -ForegroundColor Cyan
+$proOverlayCmds = @"
+add '$payloadProExtraDir' '\'
+"@
+$proOverlayCmds | & $wimlib update $newWimPath 3 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "wimlib pro extra overlay update failed" }
+
+& $wimlib export $newWimPath 3 $newWimPath "Windows 10 Enterprise" "Windows 10 Enterprise"
 if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 4 failed" }
 
 $editions = @(
@@ -604,6 +445,7 @@ $editions = @(
         BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0x7D)
         RegMap = $ltscReg
+        ProExtraCbs = $false
     },
     @{
         Index = 2
@@ -614,6 +456,7 @@ $editions = @(
         BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0xBD)
         RegMap = $ltscReg
+        ProExtraCbs = $false
     },
     @{
         Index = 3
@@ -624,6 +467,7 @@ $editions = @(
         BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x30)
         RegMap = $proReg
+        ProExtraCbs = $true
     },
     @{
         Index = 4
@@ -634,13 +478,14 @@ $editions = @(
         BaseSw = $hiveSwBase
         Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x04)
         RegMap = $proReg
+        ProExtraCbs = $true
     }
 )
 
 foreach ($ed in $editions) {
     Write-Host "  Configuring Index $($ed.Index): $($ed.Name) ($($ed.EditionId))..." -ForegroundColor Cyan
     $edHiveDir = Join-Path $tmpDir "hives_$($ed.EditionId)"
-    Build-EditionHives $ed.BaseSw $hiveSysBase $ed.EditionId $ed.CompId $ed.Name $ed.Policy $ed.RegMap $edHiveDir
+    Build-EditionHives $ed.BaseSw $hiveSysBase $ed.EditionId $ed.CompId $ed.Name $ed.Policy $ed.RegMap $ed.ProExtraCbs $edHiveDir
 
     $updateCmds = @"
 add '$edHiveDir\SYSTEM' '\Windows\System32\config\SYSTEM'
