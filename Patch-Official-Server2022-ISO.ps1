@@ -99,9 +99,102 @@ Write-Host "[1/6] Compiling embedded C# helpers..." -ForegroundColor Yellow
 
 Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 using System.Text;
 
 public class OfficialIsoHelper {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LUID { public uint LowPart; public int HighPart; }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LUID_AND_ATTRIBUTES { public LUID Luid; public uint Attributes; }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct TOKEN_PRIVILEGES {
+        public uint PrivilegeCount;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
+        public LUID_AND_ATTRIBUTES[] Privileges;
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool LookupPrivilegeValue(string lpSystemName, string lpName, out LUID lpLuid);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, bool DisableAllPrivileges, ref TOKEN_PRIVILEGES NewState, uint BufferLength, IntPtr PreviousState, IntPtr ReturnLength);
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GetCurrentProcess();
+    [DllImport("kernel32.dll")]
+    public static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
+    public static extern int RegCreateKeyExW(
+        IntPtr hKey, string lpSubKey, int Reserved, string lpClass,
+        uint dwOptions, uint samDesired, IntPtr lpSecurityAttributes,
+        out IntPtr phkResult, out uint lpdwDisposition);
+
+    [DllImport("advapi32.dll")]
+    public static extern int RegSetKeySecurity(IntPtr hKey, uint SecurityInformation, byte[] pSecurityDescriptor);
+
+    [DllImport("advapi32.dll")]
+    public static extern int RegCloseKey(IntPtr hKey);
+
+    public static void EnableRestoreAndBackupPrivileges() {
+        IntPtr hToken;
+        if (!OpenProcessToken(GetCurrentProcess(), 0x0020 | 0x0008, out hToken)) return;
+        try {
+            foreach (string priv in new[] { "SeRestorePrivilege", "SeBackupPrivilege", "SeTakeOwnershipPrivilege" }) {
+                LUID luid;
+                if (LookupPrivilegeValue(null, priv, out luid)) {
+                    var tp = new TOKEN_PRIVILEGES {
+                        PrivilegeCount = 1,
+                        Privileges = new[] { new LUID_AND_ATTRIBUTES { Luid = luid, Attributes = 0x00000002 } }
+                    };
+                    AdjustTokenPrivileges(hToken, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                }
+            }
+        } finally {
+            CloseHandle(hToken);
+        }
+    }
+
+    public static void GrantAdminsOnAllKeysInRegFile(string regFilePath) {
+        EnableRestoreAndBackupPrivileges();
+        var rsd = new RawSecurityDescriptor("D:(A;CI;KA;;;SY)(A;CI;KA;;;BA)(A;CI;KR;;;WD)");
+        byte[] sdBytes = new byte[rsd.BinaryLength];
+        rsd.GetBinaryForm(sdBytes, 0);
+
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string[] lines = File.ReadAllLines(regFilePath, Encoding.Unicode);
+        foreach (string rawLine in lines) {
+            string line = rawLine.Trim();
+            if (line.StartsWith("[HKEY_LOCAL_MACHINE\\") && line.EndsWith("]")) {
+                string subKey = line.Substring("[HKEY_LOCAL_MACHINE\\".Length, line.Length - "[HKEY_LOCAL_MACHINE\\".Length - 1);
+                if (subKey.StartsWith("-")) continue;
+                string[] parts = subKey.Split('\\');
+                var sb = new StringBuilder(parts[0]);
+                for (int i = 1; i < parts.Length; i++) {
+                    sb.Append('\\').Append(parts[i]);
+                    string curPath = sb.ToString();
+                    if (visited.Add(curPath)) {
+                        IntPtr hk;
+                        uint disp;
+                        // HKEY_LOCAL_MACHINE = 0x80000002, REG_OPTION_BACKUP_RESTORE = 0x00000004, WRITE_DAC = 0x00040000
+                        int rc = RegCreateKeyExW(new IntPtr(unchecked((int)0x80000002)), curPath, 0, null, 0x00000004, 0x00040000, IntPtr.Zero, out hk, out disp);
+                        if (rc != 0) throw new Exception("RegCreateKeyExW failed for " + curPath + " with error " + rc);
+                        try {
+                            rc = RegSetKeySecurity(hk, 0x00000004, sdBytes);
+                            if (rc != 0) throw new Exception("RegSetKeySecurity failed for " + curPath + " with error " + rc);
+                        } finally {
+                            RegCloseKey(hk);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public static byte[] HexToBytes(string hex) {
         byte[] bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++) {
@@ -292,6 +385,7 @@ Write-Host "  Registering 71 Client Drivers (Touchpad I2C/GPIO, Bluetooth Audio 
 reg.exe load "HKLM\OFFLINE_DRV" $hiveDrvBase | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "reg load OFFLINE_DRV failed" }
 try {
+    [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regDriversFile)
     reg.exe import $regDriversFile | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "reg import ClientDrivers_DRIVERS.reg failed" }
 } finally {
@@ -303,6 +397,7 @@ try {
 reg.exe load "HKLM\OFFLINE_SYS" $hiveSysBase | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "reg load OFFLINE_SYS failed" }
 try {
+    [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regSysFile)
     reg.exe import $regSysFile | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "reg import ClientDriversAndServices_SYSTEM.reg failed" }
 } finally {
@@ -327,9 +422,11 @@ function Build-EditionHives([string]$baseSwHive, [string]$baseSysHive, [string]$
     reg.exe load "HKLM\OFFLINE_SW"  $swFile  | Out-Null
     try {
         # Import Client CBS Packages & Svchost Groups into SOFTWARE hive
+        [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regSwBaseFile)
         reg.exe import $regSwBaseFile | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "reg import ClientCbsAndSvchost_Base_SOFTWARE.reg failed" }
         if ($includeProExtraCbs) {
+            [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regSwProExtFile)
             reg.exe import $regSwProExtFile | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "reg import ClientCbs_ProExtra_SOFTWARE.reg failed" }
         }
