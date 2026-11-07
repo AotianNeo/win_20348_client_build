@@ -178,30 +178,30 @@ Write-Host "[2/7] Downloading & verifying official Microsoft UUP 20348.1 Client 
 $releaseBaseUrl = "https://github.com/AotianNeo/win_20348_client_build/releases/download/v20348.1-client-payload"
 
 $uupPackages = @(
-    @{ Name = "Microsoft-Windows-Foundation-Package.ESD";                                      Sha1 = "ba8b5df4efae4fa87fb0cecf21b6069a3ff81617"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Client-Desktop-Required-Package.ESD";                         Sha1 = "5b930270062ad55a9bb8d44f08e16b9719fa23c1"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Client-Desktop-Required-WOW64-Package.ESD";                   Sha1 = "dc772f6611ff2be4912b51349de80cd6e28b51b8"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Client-Features-Package.ESD";                                 Sha1 = "c54f0db05471fb043fb446fbef4cd79b9c75a811"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Client-Features-WOW64-Package.ESD";                           Sha1 = "1dc5a25150faafcb88dc61ed68ff8a2232098409"; Stage = $true },
-    @{ Name = "Microsoft-Windows-EditionPack-Professional-Package.ESD";                        Sha1 = "6272e34d44c77a66eb4234385c759a01f74264aa"; Stage = $true },
-    @{ Name = "Microsoft-Windows-EditionPack-Professional-WOW64-Package.ESD";                  Sha1 = "8a38fd4c977b3095b05f4ab0bf402dc3fd304b2b"; Stage = $true },
-    @{ Name = "Microsoft-Windows-EditionSpecific-Professional-Package.ESD";                    Sha1 = "dfea095b1cf7261795467fa6cc07268159c87195"; Stage = $true },
-    @{ Name = "Microsoft-Windows-EditionSpecific-Professional-WOW64-Package.ESD";              Sha1 = "eb2538740bc4efca7c9e95a1e60a8a3e7f340bc7"; Stage = $true },
-    @{ Name = "Microsoft-Windows-EditionSpecific-EnterpriseG-Package.ESD";                     Sha1 = "4ab72894cf11b02fb1bdffba36765ab475c6e7bd"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Not-Supported-On-LTSB-Package.ESD";                           Sha1 = "caaa1c21ce2946d0ae12c5674ef19a911417d950"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Not-Supported-On-LTSB-WOW64-Package.ESD";                     Sha1 = "220e07bdca4fb7822e954ce9c469df1eb0f31e24"; Stage = $true },
-    @{ Name = "Microsoft-Windows-RegulatedPackages-Package.ESD";                               Sha1 = "be9d94ae3a60e2a7d9d3c376bc3e69ac2d20fc20"; Stage = $true },
-    @{ Name = "Microsoft-Windows-RegulatedPackages-WOW64-Package.ESD";                         Sha1 = "a75e8c28cb51cd92817f9a3d746e6de01d8a3fd7"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-Package.ESD";               Sha1 = "2fa34b9868917d13d95f3c8e7df9a64ee843c414"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package.ESD";         Sha1 = "e904e5e4c36d025e7a4805975a3bd5a6d7b9321b"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Server-LanguagePack-Package_zh-cn-amd64-zh-cn.esd";           Sha1 = "7f52815d30b42f128070f72ca76b394e16faec17"; Stage = $true },
-    @{ Name = "Microsoft-Windows-LanguageFeatures-Basic-zh-cn-Package-amd64.cab";              Sha1 = "fb2ebde13a1bd26183072dc63a91c1fa96d1100a"; Stage = $false },
-    @{ Name = "Microsoft-Windows-LanguageFeatures-Handwriting-zh-cn-Package-amd64.cab";        Sha1 = "8e6305212ef4d60ffcb8fd3c8a5671fd13be1ff0"; Stage = $false },
-    @{ Name = "Microsoft-Windows-LanguageFeatures-OCR-zh-cn-Package-amd64.cab";                Sha1 = "993a987b75617df0ab1cf9f19bd6bb337c84bd88"; Stage = $false },
-    @{ Name = "Microsoft-Windows-LanguageFeatures-Speech-zh-cn-Package-amd64.cab";             Sha1 = "32abdfce3c2c0e3fb66f690865d4f7b148f8220f"; Stage = $false },
-    @{ Name = "Microsoft-Windows-LanguageFeatures-TextToSpeech-zh-cn-Package-amd64.cab";       Sha1 = "a2086d605a92a07abdc2d5f784a55f2df6c06963"; Stage = $false },
-    @{ Name = "Microsoft.ModernApps.Client.All.esd";                                           Sha1 = "8154e3df67387100ce3f3d720dc434deff6ec9b1"; Stage = $false },
-    @{ Name = "Microsoft.ModernApps.Client.professional.esd";                                  Sha1 = "e2f15cc4b38672fc1f154c93d379050b9ca0e0dd"; Stage = $false }
+    @{ Name = "Microsoft-Windows-Foundation-Package.ESD";                                      Sha256 = "62e0a329a7c2679b198ba8d76c66c3ebe663bf72635082579db794a9b22d3b41"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Desktop-Required-Package.ESD";                         Sha256 = "154ab40e155ec5e86647cc74aca45f237aa17fb1e8c545b340809233fde7ccc3"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Desktop-Required-WOW64-Package.ESD";                   Sha256 = "7edceb201c1f677105a32eec7cd0f1e718515bd23b7394f2eb5e4af38e3fec94"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Features-Package.ESD";                                 Sha256 = "58ac2982ef5d0e60aa8f994c3d881ef601b701eb1a06e2ffe1d8011ecfb5adb0"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Features-WOW64-Package.ESD";                           Sha256 = "db113dabb979aa1b59b00038dd30ca74b7e957ea41a11cab1d9ec87bc65fe0cf"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionPack-Professional-Package.ESD";                        Sha256 = "97dbfb18444dde1a234f32c91fa405c4ba9cca1a0590aa59cf33cb462ee5be8d"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionPack-Professional-WOW64-Package.ESD";                  Sha256 = "a26ec4ae46838edf3bb88b2ab4ce96e5839be6becec8d36511cda741c91e83ec"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionSpecific-Professional-Package.ESD";                    Sha256 = "d7450c0146220224ba49ae9b3b8f2524a6570410a31ca5d73d197c880eae28cb"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionSpecific-Professional-WOW64-Package.ESD";              Sha256 = "b63263824c2c3e1ed0bcb60207e96973eaa0c4997a52731d59ea7aba515dd7ff"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionSpecific-EnterpriseG-Package.ESD";                     Sha256 = "9606fe088b0a9bc9f3968706148d234412d6454bbbe628c33ba4d6d1ad575d2d"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Not-Supported-On-LTSB-Package.ESD";                           Sha256 = "ed1e1f8ee4f514b7c9aae16eef8ee20777fd069a75ef23d310d51db4c1b99a7b"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Not-Supported-On-LTSB-WOW64-Package.ESD";                     Sha256 = "10242e26e13ced1ef5aa631aab3c785a2e5e80bc0aa5827a9574293754460c7e"; Stage = $true },
+    @{ Name = "Microsoft-Windows-RegulatedPackages-Package.ESD";                               Sha256 = "a1c7463a56f7d05e5327a018125a1780d0ca5599f5b47c4096a242d439d66656"; Stage = $true },
+    @{ Name = "Microsoft-Windows-RegulatedPackages-WOW64-Package.ESD";                         Sha256 = "6db86cab62086c4ca5b9c4fc75817f04938d7e9e5c96bf6f172ec389ff928aa9"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-Package.ESD";               Sha256 = "b6c3eadcedc310cf56573ab3e16eaa87aead3ba13a972d230a007d2618a8daee"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package.ESD";         Sha256 = "ad0d4c8ab12478215fd5f804199cafba2909f64b8caea325c47f5d11d66d0298"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Server-LanguagePack-Package_zh-cn-amd64-zh-cn.esd";           Sha256 = "0814fcd282a25766db2bd95f887172e418ac13d2a565bf5473569801a130c357"; Stage = $true },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-Basic-zh-cn-Package-amd64.cab";              Sha256 = "86fb9316e85a8c651ab25cf22474f0a0bd4fcd8a624a31850c9d4105f91f8536"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-Handwriting-zh-cn-Package-amd64.cab";        Sha256 = "5a84f7330c9d58b9af9166b7d954241aae7f208e1f291be6ef0a3bc6b3b4a131"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-OCR-zh-cn-Package-amd64.cab";                Sha256 = "aad4f02e2be0cd19718e3bfebc7f09e1956c7b42c5fb1f9d52f2bcd0c05074cf"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-Speech-zh-cn-Package-amd64.cab";             Sha256 = "5752678b19ddd970e09cbd92b84e651f0de1ec040803f94f50bc6eace45ef57f"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-TextToSpeech-zh-cn-Package-amd64.cab";       Sha256 = "ff37f75bd09539fd67a13adfa31723ced6048307f20f9eb0b539fcc8c7b38d0d"; Stage = $false },
+    @{ Name = "Microsoft.ModernApps.Client.All.esd";                                           Sha256 = "ad740246597698717ae93fa12df03ce08cf985e91695b3a4a712e29515a5164c"; Stage = $false },
+    @{ Name = "Microsoft.ModernApps.Client.professional.esd";                                  Sha256 = "eabf2c72cb45c0d107e8fb0c8a0877e8e35efec46d6a1b7064086462f31d51aa"; Stage = $false }
 )
 
 foreach ($pkg in $uupPackages) {
@@ -211,9 +211,9 @@ foreach ($pkg in $uupPackages) {
         & $aria2c -x16 -s16 -k1M --file-allocation=none --console-log-level=warn -d $uupDir -o $pkg.Name "$releaseBaseUrl/$($pkg.Name)"
         if ($LASTEXITCODE -ne 0) { throw "Failed to download $($pkg.Name)" }
     }
-    $h = (Get-FileHash -Path $destFile -Algorithm SHA1).Hash.ToLowerInvariant()
-    if ($h -ne $pkg.Sha1) {
-        throw "SHA-1 mismatch for $($pkg.Name): expected $($pkg.Sha1), got $h"
+    $h = (Get-FileHash -Path $destFile -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($h -ne $pkg.Sha256) {
+        throw "SHA-256 mismatch for $($pkg.Name): expected $($pkg.Sha256), got $h"
     }
     if ($pkg.Stage) {
         & $wimlib apply $destFile 1 $uupStagePool --no-acls | Out-Null
@@ -277,6 +277,10 @@ Write-Host "  Enabling .NET Framework 3.5 (NetFx3) from $sxsDir..." -ForegroundC
 dism.exe /Image:$mountDir /Enable-Feature /FeatureName:NetFx3 /All /LimitAccess /Source:$sxsDir
 if ($LASTEXITCODE -ne 0) { throw "DISM Enable-Feature NetFx3 failed" }
 
+# Copy all LCU .mum/.cat files from the mounted image into $uupStagePool first so DISM can resolve all LCU child packages from source
+Copy-Item "$mountDir\Windows\servicing\Packages\*.mum" $uupStagePool -Force
+Copy-Item "$mountDir\Windows\servicing\Packages\*.cat" $uupStagePool -Force
+
 # Copy OfficialEditionManifests into $uupStagePool and generate version-aligned $pkgVer .mum files
 $manifestsDir = Join-Path $PSScriptRoot "OfficialEditionManifests"
 $proMum1 = Join-Path $manifestsDir "Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~10.0.20348.1.mum"
@@ -284,16 +288,14 @@ $mpMum1  = Join-Path $manifestsDir "Microsoft-Windows-Media-Placeholder-Package~
 Copy-Item $proMum1 $uupStagePool -Force
 Copy-Item $mpMum1  $uupStagePool -Force
 
-# Build lookup of latest installed/staged package versions in $mountDir\Windows\servicing\Packages and $uupStagePool
+# Build lookup of latest installed/staged neutral package versions in $uupStagePool
 $latestPkgMap = @{}
-foreach ($dir in @("$uupStagePool", "$mountDir\Windows\servicing\Packages")) {
-    Get-ChildItem "$dir\*.mum" | ForEach-Object {
-        if ($_.Name -match '^([^~]+)~([^~]+)~([^~]+)~([^~]*)~([0-9\.]+)\.mum$') {
-            $key = "$($matches[1])~$($matches[2])~$($matches[3])~$($matches[4])".ToLowerInvariant()
-            $ver = [version]$matches[5]
-            if (-not $latestPkgMap.ContainsKey($key) -or $ver -gt [version]$latestPkgMap[$key]) {
-                $latestPkgMap[$key] = $matches[5]
-            }
+Get-ChildItem "$uupStagePool\*.mum" | ForEach-Object {
+    if ($_.Name -match '^([^~]+)~31bf3856ad364e35~amd64~~([0-9\.]+)\.mum$') {
+        $key = $matches[1].ToLowerInvariant()
+        $ver = [version]$matches[2]
+        if (-not $latestPkgMap.ContainsKey($key) -or $ver -gt [version]$latestPkgMap[$key]) {
+            $latestPkgMap[$key] = $matches[2]
         }
     }
 }
@@ -303,27 +305,90 @@ $mpXml = [System.IO.File]::ReadAllText($mpMum1)
 $mpXml = $mpXml.Replace('version="10.0.20348.1"', "version=`"$pkgVer`"")
 $mpOut = Join-Path $uupStagePool "Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~$pkgVer.mum"
 [System.IO.File]::WriteAllText($mpOut, $mpXml, [System.Text.Encoding]::UTF8)
-$latestPkgMap["microsoft-windows-media-placeholder-package~31bf3856ad364e35~amd64~"] = $pkgVer
 
-# Align ProfessionalEdition to $pkgVer and match every child <package> to the latest version in $latestPkgMap
+# Construct version-aligned ProfessionalEdition~$pkgVer.mum with the 15 base .1 Client packages + LCU-updated shared/foundation packages
+$lcuSharedPkgNames = @(
+    "Microsoft-Windows-ServerCore-SKU-Foundation-Package",
+    "Microsoft-Windows-ServerCore-SKU-Foundation-WOW64-Package",
+    "Microsoft-Windows-ServerCore-WOW64-Payload-Package",
+    "Microsoft-Windows-ServerCore-WowRequired-WOW64-Package",
+    "Microsoft-Windows-Server-Features-Package",
+    "Microsoft-Windows-Foundation-Group-Package",
+    "Microsoft-Windows-Foundation-Group-WOW64-Package",
+    "Microsoft-Windows-Product-Data-Package",
+    "Microsoft-Windows-BootEnvironment-BootManagers-Package",
+    "Microsoft-Windows-Servicing-Full-Package",
+    "Microsoft-Windows-Servicing-Core-X86-Package",
+    "Microsoft-Windows-Desktop-Shared-Drivers-Package",
+    "Microsoft-Windows-Desktop-Shared-Drivers-WOW64-Package",
+    "Microsoft-Windows-Enterprise-Desktop-Shared-Package",
+    "Microsoft-Windows-Enterprise-Desktop-Shared-WOW64-Package",
+    "Multimedia-AudioCore-Full-Package",
+    "Microsoft-Windows-Media-Format-Package",
+    "Microsoft-Windows-Media-Format-WOW64-Package",
+    "Microsoft-Windows-Portable-Devices-Package",
+    "Microsoft-Windows-Portable-Devices-WOW64-Package",
+    "Microsoft-Windows-WebcamExperience-Package",
+    "Microsoft-Windows-WebcamExperience-WOW64-Package",
+    "Microsoft-Windows-SenseClient-Package",
+    "Microsoft-Windows-RecDisc-SDP-Package",
+    "Microsoft-Windows-AppManagement-AppV-Package",
+    "Microsoft-Windows-AppManagement-AppV-WOW64-Package",
+    "Microsoft-Windows-AppManagement-Common-Package",
+    "Microsoft-Windows-AppManagement-Common-WOW64-Package",
+    "Microsoft-Windows-AppManagement-UEV-Package",
+    "Microsoft-Windows-AppManagement-UEV-WOW64-Package",
+    "Microsoft-Windows-FCI-Client-Package",
+    "Microsoft-Windows-FCI-Client-WOW64-Package",
+    "Microsoft-Media-Foundation-Server-Package",
+    "Microsoft-Media-Foundation-Server-WOW64-Package"
+)
+
 [xml]$proDoc = [System.IO.File]::ReadAllText($proMum1)
 $proDoc.assembly.assemblyIdentity.version = $pkgVer
-foreach ($upd in $proDoc.assembly.package.update) {
-    $ai = $upd.package.assemblyIdentity
-    if ($ai) {
-        $lang = if ($ai.language -and $ai.language -ne "neutral") { $ai.language } else { "" }
-        $lookupKey = "$($ai.name)~$($ai.publicKeyToken)~$($ai.processorArchitecture)~$lang".ToLowerInvariant()
-        if ($latestPkgMap.ContainsKey($lookupKey)) {
-            $ai.version = $latestPkgMap[$lookupKey]
-        }
+$nsUri = $proDoc.assembly.NamespaceURI
+$pkgNode = $proDoc.assembly.package
+
+# Add hidden ServerCore-Package (10.0.20348.1) solely to satisfy parent check of ServerCore-WOW64-Package -> ServerCore-WOW64-Payload-Package
+$scUpd = $proDoc.CreateElement("update", $nsUri)
+$scUpd.SetAttribute("name", "Microsoft-Windows-ServerCore-Package_base")
+$scPkg = $proDoc.CreateElement("package", $nsUri)
+$scPkg.SetAttribute("contained", "false")
+$scPkg.SetAttribute("integrate", "hidden")
+$scAi = $proDoc.CreateElement("assemblyIdentity", $nsUri)
+$scAi.SetAttribute("name", "Microsoft-Windows-ServerCore-Package")
+$scAi.SetAttribute("version", "10.0.20348.1")
+$scAi.SetAttribute("processorArchitecture", "amd64")
+$scAi.SetAttribute("language", "neutral")
+$scAi.SetAttribute("buildType", "release")
+$scAi.SetAttribute("publicKeyToken", "31bf3856ad364e35")
+[void]$scPkg.AppendChild($scAi)
+[void]$scUpd.AppendChild($scPkg)
+[void]$pkgNode.AppendChild($scUpd)
+
+foreach ($lcuPkgName in $lcuSharedPkgNames) {
+    $lk = $lcuPkgName.ToLowerInvariant()
+    if ($latestPkgMap.ContainsKey($lk)) {
+        $ver = $latestPkgMap[$lk]
+        $uNode = $proDoc.CreateElement("update", $nsUri)
+        $uNode.SetAttribute("name", "${lcuPkgName}_lcu")
+        $pNode = $proDoc.CreateElement("package", $nsUri)
+        $pNode.SetAttribute("contained", "false")
+        $pNode.SetAttribute("integrate", "hidden")
+        $aiNode = $proDoc.CreateElement("assemblyIdentity", $nsUri)
+        $aiNode.SetAttribute("name", $lcuPkgName)
+        $aiNode.SetAttribute("version", $ver)
+        $aiNode.SetAttribute("processorArchitecture", "amd64")
+        $aiNode.SetAttribute("language", "neutral")
+        $aiNode.SetAttribute("buildType", "release")
+        $aiNode.SetAttribute("publicKeyToken", "31bf3856ad364e35")
+        [void]$pNode.AppendChild($aiNode)
+        [void]$uNode.AppendChild($pNode)
+        [void]$pkgNode.AppendChild($uNode)
     }
 }
 $proOut = Join-Path $uupStagePool "Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~$pkgVer.mum"
 $proDoc.Save($proOut)
-
-# Also copy the LCU-updated Server-LanguagePack and Media-Foundation-Server-Package .mum/.cat from mounted image into $uupStagePool so DISM can reference them from source
-Copy-Item "$mountDir\Windows\servicing\Packages\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~$pkgVer.*" $uupStagePool -Force
-Copy-Item "$mountDir\Windows\servicing\Packages\Microsoft-Media-Foundation-Server-Package~31bf3856ad364e35~amd64~~$mfVer.*" $uupStagePool -Force
 
 # Construct the 100% Native DISM Servicing Unattend XML
 $unattendPath = Join-Path $tmpDir "native_client_switch.xml"
@@ -433,18 +498,30 @@ $unattendContent = @"
         <package action="remove">
             <assemblyIdentity name="Microsoft-Windows-ServerStandardEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
         </package>
+        <package action="remove">
+            <assemblyIdentity name="Microsoft-Windows-ServerDatacenterEdition" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+        <package action="remove">
+            <assemblyIdentity name="Microsoft-Windows-ServerDatacenterEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+        <package action="remove">
+            <assemblyIdentity name="Downlevel-NLS-Sorting-Versions-Server-FoD-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+        <package action="remove">
+            <assemblyIdentity name="Downlevel-NLS-Sorting-Versions-Server-FoD-Package" version="10.0.20348.1" processorArchitecture="wow64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
     </servicing>
 </unattend>
 "@
 [System.IO.File]::WriteAllText($unattendPath, $unattendContent, [System.Text.Encoding]::UTF8)
 
-Write-Host "  Executing DISM /Apply-Unattend (Native CBS Stage + Edition Switch + LCU Preservation)..." -ForegroundColor Cyan
+Write-Host "  Executing DISM /Apply-Unattend (Native CBS Stage + Edition Switch + LCU Preservation + Server SKU/FoD Removal)..." -ForegroundColor Cyan
 dism.exe /Image:$mountDir /Apply-Unattend:$unattendPath
 if ($LASTEXITCODE -ne 0) { throw "DISM /Apply-Unattend failed with exit code $LASTEXITCODE" }
 
-# Remove any remaining ServerDatacenterEdition or Server-Shell-Package packages if present in the image
+# Remove any remaining standalone top-level Server optional packages if present in the image
 $extraRemovePkgs = Get-ChildItem "$mountDir\Windows\servicing\Packages\*.mum" |
-    Where-Object { $_.BaseName -match '^(Microsoft-Windows-ServerDatacenterEdition|Microsoft-Windows-Server-Shell-Package|PowerShell-SConfig-Package|Microsoft-ServerCore-ShellLauncher-Package)~' } |
+    Where-Object { $_.BaseName -match '^(Microsoft-Windows-ServerDatacenterEdition|Downlevel-NLS-Sorting-Versions-Server-FoD-Package|Microsoft-Windows-Server-AppCompat-FoD-Package|Microsoft-Server-AzureArcSetup-FoD-Package|Microsoft-Windows-ServerManager-Tools-FoD-Package)~' } |
     Select-Object -ExpandProperty BaseName
 if ($extraRemovePkgs) {
     foreach ($pkgIdentity in $extraRemovePkgs) {
