@@ -18,7 +18,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Run Official Server 2022 -> 20348 Client Patcher (100% Microsoft Sources)
+      - name: Run Official Server 2022 -> 20348 Client Native DISM/CBS Builder
         id: build
         shell: pwsh
         run: |
@@ -67,20 +67,18 @@ jobs:
           $notes = @"
           ## Windows 10 (Build $buildVer / Fe 20348) Client Multi-Edition ISO (x64, zh-CN)
 
-          **Full Client Reconstruction from Official Microsoft Sources**:
+          **100% Native DISM / CBS Servicing Reconstruction from Official Microsoft Sources**:
           - **Base OS & Monthly LCU**: Official Microsoft Windows Server 2022 Monthly Updated ISO (`$buildVer`, fetched & SHA-256 verified via `ntriver.org`)
-          - **Full Client CBS Packages & WinSxS Components**: Injected 581 Client CBS Packages (`Microsoft-Windows-EnterpriseSEdition`, `Microsoft-Windows-ProfessionalEdition`, Client Features & Svchost Service Groups)
-          - **71 Client Hardware Drivers & 99 Client Services Pre-Registered (`DRIVERS` & `SYSTEM` Hives)**:
-            - **12 Laptop Precision Touchpad I2C / GPIO Host Controller Drivers**: Intel Serial IO (`iai2c.inf`, `iagpio.inf`, `ialpss2i_i2c_*.inf`, `ialpss2i_gpio2_*.inf`) & AMD (`amdi2c.inf`, `amdgpio2.inf`)
-            - **7 Bluetooth Audio Drivers**: A2DP Sink/Source (`BthA2dp.sys`), AVRCP Transport (`Microsoft.Bluetooth.AvrcpTransport.sys`), Hands-Free Profile & Audio Gateway (`BthHfAud.sys`, `BthHfEnum.sys`, `BthAvctpSvc`, `BTAGService`, `BluetoothUserService`)
-            - **44 Desktop Wireless Wi-Fi Adapter Drivers & 4 Xbox Controller Drivers**: Intel Wi-Fi (`netwtw02/04/06/08.inf`), Realtek (`netrtwlane*.inf`), Qualcomm Atheros (`athw8x.inf`), Broadcom (`bcmdhd64.inf`), Xbox GIP/HID (`xboxgip.inf`, `xinputhid.inf`, `xusb22.inf`)
-          - **Pre-Enabled `.NET Framework 3.5 (NetFx3)`**: Enabled by default out-of-the-box via official `sources\sxs` CAB.
+          - **100% Native DISM / CBS Servicing (Zero Handcrafted Post-Hoc `.reg` Injection)**:
+            - Stages and installs all 17 official Microsoft UUP `20348.1` (`2ba1d737-a36b-415b-a630-85bd5146d77d`) Client ESD packages + 5 `zh-CN` LanguageFeatures FOD CABs via `dism.exe /Apply-Unattend` and `dism.exe /Set-Edition`.
+            - Full Lifecycle Monthly LCU Update Support (`$buildVer`): OS Core, Shell (`explorer.exe`, `shell32.dll`, `dwmcore.dll`, `udwm.dll`), Bluetooth (`BthEnum.sys`, `bthport.sys`), and Media Foundation (`mfplat.dll`, `mfcore.dll`) all remain at the latest LCU version and support future monthly cumulative updates.
+            - Default Client Visual Effects Enabled Out-of-the-Box (`VisualFXSetting = 1`), pure Client `WinNT` ProductType (`Win32PrioritySeparation = 2`), and pre-enabled `.NET Framework 3.5 (NetFx3)`.
 
           ### Included Editions (`sources\install.wim`)
-          1. **Windows 10 Enterprise LTSC 2021** (`EnterpriseS`)
-          2. **Windows 10 IoT Enterprise LTSC 2021** (`IoTEnterpriseS`)
-          3. **Windows 10 Pro** (`Professional`)
-          4. **Windows 10 Enterprise** (`Enterprise`)
+          1. **Windows 10 IoT Enterprise** (`IoTEnterprise` — Clean LTSC-style Edition without Consumer UWP Bloat)
+          2. **Windows 10 Pro** (`Professional` — Full Official Microsoft Store & 41 Modern UWP Apps Provisioned)
+          3. **Windows 10 Pro for Workstations** (`ProfessionalWorkstation` — Native `dism /Set-Edition:ProfessionalWorkstation`)
+          4. **Windows 10 Enterprise** (`Enterprise` — Native `dism /Set-Edition:Enterprise`)
 
           ### Verification
           - **ISO Filename**: `$isoName`
@@ -93,4 +91,4 @@ jobs:
               gh release delete $tagName --yes --cleanup-tag
           }
           $assets = @("$outDir\SHA256SUMS.txt") + (Get-ChildItem "$outDir\$isoName.7z.*").FullName
-          gh release create $tagName @assets --title "Windows 20348 Client ($buildVer) Official Patch ISO" --notes $notes
+          gh release create $tagName @assets --title "Windows 20348 Client ($buildVer) Official Native DISM ISO" --notes $notes

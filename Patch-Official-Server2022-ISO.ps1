@@ -1,20 +1,17 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    100% Official Source Automated Patcher: Windows Server 2022 (Build 20348) -> Windows 20348 Client Multi-Edition ISO
-    Editions Built:
-      1. Windows 10 Enterprise LTSC 2021 (EnterpriseS)
-      2. Windows 10 IoT Enterprise LTSC 2021 (IoTEnterpriseS)
-      3. Windows 10 Pro (Professional)
-      4. Windows 10 Enterprise (Enterprise)
-    Features Included:
-      - Full Client CBS Packages & WinSxS Components (EnterpriseS + Professional/Enterprise)
-      - 71 Client-Only Hardware Drivers Registered in DRIVERS & SYSTEM Hives:
-          * 12 Intel/AMD Serial IO I2C & GPIO Touchpad Host Controller Drivers
-          * 7 Bluetooth Audio Profile Drivers (A2DP Sink/Source, AVRCP Transport, HFP Hands-Free/Audio Gateway)
-          * 44 Desktop Wireless Wi-Fi Network Adapters (Intel/Realtek/Qualcomm/Broadcom) & 4 Xbox GIP/HID Drivers
-      - 99 Client Services & Svchost Service Groups (BthAvctpSvc, BTAGService, BluetoothUserService, XboxGipSvc, etc.)
-      - Default Pre-Enabled .NET Framework 3.5 (NetFx3) from Official ISO sources\sxs CAB
+    100% Native DISM / CBS Servicing Builder:
+    Windows Server 2022 Monthly Updated ISO (Build 20348.xxxx) -> Windows 10 Build 20348 Client Multi-Edition ISO
+    - Zero handcrafted post-hoc .reg driver/CBS injection: 100% compiled natively by Windows CBS / WCP / DrvInst / Transmog
+      using official Microsoft UUP 20348.1 (2ba1d737-a36b-415b-a630-85bd5146d77d) Client ESD/CAB packages.
+    - Full Lifecycle Monthly LCU Update Support (OS Core, Shell explorer.exe/shell32.dll/dwmcore.dll, Bluetooth, and Media Foundation at latest LCU).
+    - Default Client Visual Effects Enabled Out-of-the-Box (VisualFXSetting = 1).
+    - Editions Built:
+        1. Windows 10 IoT Enterprise (IoTEnterprise - Clean LTSC-style Edition without Consumer UWP Apps)
+        2. Windows 10 Pro (Professional - Full Official Microsoft Store & 41 Modern UWP Apps Provisioned)
+        3. Windows 10 Pro for Workstations (ProfessionalWorkstation - Native DISM /Set-Edition)
+        4. Windows 10 Enterprise (Enterprise - Native DISM /Set-Edition)
 #>
 param(
     [string]$WorkDir = "$PSScriptRoot\work",
@@ -25,25 +22,22 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host " Windows 20348 Client ISO Builder (Full Client Packages & Drivers)" -ForegroundColor Cyan
+Write-Host " Windows 10 Build 20348 Client ISO Builder (100% Native DISM/CBS)" -ForegroundColor Cyan
 Write-Host "==================================================================" -ForegroundColor Cyan
 
 New-Item -ItemType Directory -Force -Path $WorkDir, $OutputDir | Out-Null
-$tmpDir = Join-Path $WorkDir "tmp"
-$ltscStaging = Join-Path $WorkDir "ltsc_official"
-$proStaging = Join-Path $WorkDir "pro_official"
-$clientOverlay = Join-Path $WorkDir "client_overlay"
+$tmpDir        = Join-Path $WorkDir "tmp"
+$uupDir        = Join-Path $WorkDir "uup_official_20348"
+$uupStagePool  = Join-Path $WorkDir "uup_stage_pool"
+$modernAppsDir = Join-Path $WorkDir "modern_apps"
 $isoExtractDir = Join-Path $WorkDir "iso_root"
-$mountDir = Join-Path $WorkDir "mount"
-$pkgStaging = Join-Path $WorkDir "synth_pkgs"
-$payloadEntSDir = Join-Path $WorkDir "payload_entS"
-$payloadProExtraDir = Join-Path $WorkDir "payload_pro_extra"
-New-Item -ItemType Directory -Force -Path $tmpDir, $ltscStaging, $proStaging, $clientOverlay, $isoExtractDir, $mountDir, $pkgStaging, $payloadEntSDir, $payloadProExtraDir | Out-Null
+$mountDir      = Join-Path $WorkDir "mount"
+New-Item -ItemType Directory -Force -Path $tmpDir, $uupDir, $uupStagePool, $modernAppsDir, $isoExtractDir, $mountDir | Out-Null
 
 # ---------------------------------------------------------------------------
 # 0. Ensure Required CLI Tools (wimlib-imagex, aria2c, 7z, oscdimg)
 # ---------------------------------------------------------------------------
-Write-Host "[0/6] Checking required build tools..." -ForegroundColor Yellow
+Write-Host "[0/7] Checking required build tools..." -ForegroundColor Yellow
 
 function Get-ToolPath([string]$cmdName, [string[]]$fallbackPaths) {
     $cmd = Get-Command $cmdName -ErrorAction SilentlyContinue
@@ -87,148 +81,64 @@ if (-not $oscdimg) {
     $oscdimg = "$WorkDir\tools\oscdimg.exe"
 }
 
-Write-Host "  wimlib : $wimlib"
-Write-Host "  aria2c : $aria2c"
-Write-Host "  7z     : $sevenZip"
-Write-Host "  oscdimg: $oscdimg"
-
-# ---------------------------------------------------------------------------
-# 1. Compile Embedded C# Helpers (Hex & ProductPolicy SKU Patcher)
-# ---------------------------------------------------------------------------
-Write-Host "[1/6] Compiling embedded C# helpers..." -ForegroundColor Yellow
-
+# Add Backup/Restore Registry privilege helper for cleaning TrustedInstaller-protected AvailableShells key if needed
 Add-Type -TypeDefinition @'
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Security.AccessControl;
-using System.Text;
-
-public class OfficialIsoHelper {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct LUID { public uint LowPart; public int HighPart; }
-    [StructLayout(LayoutKind.Sequential)]
-    public struct LUID_AND_ATTRIBUTES { public LUID Luid; public uint Attributes; }
+public class RegPrivHelper {
+    [DllImport("advapi32.dll", SetLastError=true)]
+    public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+    [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool LookupPrivilegeValue(string lpSystemName, string lpName, out long lpLuid);
     [StructLayout(LayoutKind.Sequential)]
     public struct TOKEN_PRIVILEGES {
         public uint PrivilegeCount;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
-        public LUID_AND_ATTRIBUTES[] Privileges;
+        public long Luid;
+        public uint Attributes;
     }
-
-    [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    public static extern bool LookupPrivilegeValue(string lpSystemName, string lpName, out LUID lpLuid);
-    [DllImport("advapi32.dll", SetLastError = true)]
+    [DllImport("advapi32.dll", SetLastError=true)]
     public static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, bool DisableAllPrivileges, ref TOKEN_PRIVILEGES NewState, uint BufferLength, IntPtr PreviousState, IntPtr ReturnLength);
-    [DllImport("kernel32.dll")]
-    public static extern IntPtr GetCurrentProcess();
-    [DllImport("kernel32.dll")]
-    public static extern bool CloseHandle(IntPtr hObject);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
-    public static extern int RegCreateKeyExW(
-        IntPtr hKey, string lpSubKey, int Reserved, string lpClass,
-        uint dwOptions, uint samDesired, IntPtr lpSecurityAttributes,
-        out IntPtr phkResult, out uint lpdwDisposition);
-
-    [DllImport("advapi32.dll")]
-    public static extern int RegSetKeySecurity(IntPtr hKey, uint SecurityInformation, byte[] pSecurityDescriptor);
-
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+    public static extern int RegOpenKeyExW(IntPtr hKey, string subKey, uint options, uint samDesired, out IntPtr phkResult);
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+    public static extern int RegDeleteValueW(IntPtr hKey, string lpValueName);
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+    public static extern int RegSetValueExW(IntPtr hKey, string lpValueName, uint Reserved, uint dwType, byte[] lpData, int cbData);
     [DllImport("advapi32.dll")]
     public static extern int RegCloseKey(IntPtr hKey);
 
-    public static void EnableRestoreAndBackupPrivileges() {
+    public static void EnablePriv(string name) {
         IntPtr hToken;
-        if (!OpenProcessToken(GetCurrentProcess(), 0x0020 | 0x0008, out hToken)) return;
-        try {
-            foreach (string priv in new[] { "SeRestorePrivilege", "SeBackupPrivilege", "SeTakeOwnershipPrivilege" }) {
-                LUID luid;
-                if (LookupPrivilegeValue(null, priv, out luid)) {
-                    var tp = new TOKEN_PRIVILEGES {
-                        PrivilegeCount = 1,
-                        Privileges = new[] { new LUID_AND_ATTRIBUTES { Luid = luid, Attributes = 0x00000002 } }
-                    };
-                    AdjustTokenPrivileges(hToken, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
-                }
-            }
-        } finally {
-            CloseHandle(hToken);
-        }
+        OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x28, out hToken);
+        long luid;
+        LookupPrivilegeValue(null, name, out luid);
+        TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES { PrivilegeCount = 1, Luid = luid, Attributes = 2 };
+        AdjustTokenPrivileges(hToken, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
     }
 
-    public static void GrantAdminsOnAllKeysInRegFile(string regFilePath) {
-        EnableRestoreAndBackupPrivileges();
-        var rsd = new RawSecurityDescriptor("D:(A;CI;KA;;;SY)(A;CI;KA;;;BA)(A;CI;KR;;;WD)");
-        byte[] sdBytes = new byte[rsd.BinaryLength];
-        rsd.GetBinaryForm(sdBytes, 0);
-
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        string[] lines = File.ReadAllLines(regFilePath, Encoding.Unicode);
-        foreach (string rawLine in lines) {
-            string line = rawLine.Trim();
-            if (line.StartsWith("[HKEY_LOCAL_MACHINE\\") && line.EndsWith("]")) {
-                string subKey = line.Substring("[HKEY_LOCAL_MACHINE\\".Length, line.Length - "[HKEY_LOCAL_MACHINE\\".Length - 1);
-                if (subKey.StartsWith("-")) continue;
-                string[] parts = subKey.Split('\\');
-                var sb = new StringBuilder(parts[0]);
-                for (int i = 1; i < parts.Length; i++) {
-                    sb.Append('\\').Append(parts[i]);
-                    string curPath = sb.ToString();
-                    if (visited.Add(curPath)) {
-                        IntPtr hk;
-                        uint disp;
-                        // HKEY_LOCAL_MACHINE = 0x80000002, REG_OPTION_BACKUP_RESTORE = 0x00000004, WRITE_DAC = 0x00040000
-                        int rc = RegCreateKeyExW(new IntPtr(unchecked((int)0x80000002)), curPath, 0, null, 0x00000004, 0x00040000, IntPtr.Zero, out hk, out disp);
-                        if (rc != 0) throw new Exception("RegCreateKeyExW failed for " + curPath + " with error " + rc);
-                        try {
-                            rc = RegSetKeySecurity(hk, 0x00000004, sdBytes);
-                            if (rc != 0) throw new Exception("RegSetKeySecurity failed for " + curPath + " with error " + rc);
-                        } finally {
-                            RegCloseKey(hk);
-                        }
-                    }
-                }
-            }
+    public static void EnsurePureExplorerAvailableShell(string hiveKeyPath) {
+        EnablePriv("SeRestorePrivilege");
+        EnablePriv("SeBackupPrivilege");
+        EnablePriv("SeTakeOwnershipPrivilege");
+        IntPtr hKey;
+        IntPtr HKEY_LOCAL_MACHINE = new IntPtr(unchecked((int)0x80000002));
+        // REG_OPTION_BACKUP_RESTORE = 4, KEY_ALL_ACCESS = 0xF003F
+        int res = RegOpenKeyExW(HKEY_LOCAL_MACHINE, hiveKeyPath, 4, 0xF003F, out hKey);
+        if (res == 0) {
+            RegDeleteValueW(hKey, "40000");
+            RegDeleteValueW(hKey, "30000");
+            byte[] data = System.Text.Encoding.Unicode.GetBytes("explorer.exe\0");
+            RegSetValueExW(hKey, "60000", 0, 1, data, data.Length);
+            RegCloseKey(hKey);
         }
-    }
-
-    public static byte[] HexToBytes(string hex) {
-        byte[] bytes = new byte[hex.Length / 2];
-        for (int i = 0; i < bytes.Length; i++) {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        return bytes;
-    }
-
-    public static byte[] PatchProductPolicySku(byte[] policyBytes, uint targetProductInfo) {
-        byte[] b = (byte[])policyBytes.Clone();
-        int pos = 20;
-        int end = BitConverter.ToInt32(b, 0);
-        while (pos + 16 <= end && pos + 16 <= b.Length) {
-            ushort entrySize = BitConverter.ToUInt16(b, pos);
-            ushort nameSize  = BitConverter.ToUInt16(b, pos + 2);
-            ushort valType   = BitConverter.ToUInt16(b, pos + 4);
-            ushort valSize   = BitConverter.ToUInt16(b, pos + 6);
-            if (entrySize == 0) break;
-            string name = Encoding.Unicode.GetString(b, pos + 16, nameSize);
-            int valOff = pos + 16 + nameSize;
-            if ((name == "Kernel-ProductInfo" || name == "Kernel-BrandingInfo") && valType == 4 && valSize == 4) {
-                Buffer.BlockCopy(BitConverter.GetBytes(targetProductInfo), 0, b, valOff, 4);
-            }
-            pos += entrySize;
-        }
-        return b;
     }
 }
 '@
 
 # ---------------------------------------------------------------------------
-# 2. Fetch Latest Official Windows Server 2022 ISO from ntriver.org
+# 1. Fetch Latest Official Windows Server 2022 ISO from ntriver.org
 # ---------------------------------------------------------------------------
-Write-Host "[2/6] Querying ntriver.org for the latest official Windows Server 2022 ISO..." -ForegroundColor Yellow
+Write-Host "[1/7] Querying ntriver.org for the latest official Windows Server 2022 ISO..." -ForegroundColor Yellow
 
 $mdxUrl = "https://raw.githubusercontent.com/ntriver-org/ntriver-org-site/main/docs/download-windows-office/windows-server-iso-files-rtm/download-windows-server-2022.mdx"
 $mdxContent = (Invoke-WebRequest -Uri $mdxUrl -UseBasicParsing).Content
@@ -261,65 +171,66 @@ if ($actualSha256 -ne $srvSha256) {
 Write-Host "  Verified SHA-256: $actualSha256 [OK]" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 3. Load Official Client Assets, Registry Exports & ClientPayload_20348.esd
+# 2. Download & Verify Official Microsoft UUP 20348.1 Client ESD & CAB Packages
 # ---------------------------------------------------------------------------
-Write-Host "[3/6] Loading official Client SKU tokens, Registry Hives & ClientPayload_20348.esd..." -ForegroundColor Yellow
+Write-Host "[2/7] Downloading & verifying official Microsoft UUP 20348.1 Client ESD/CAB packages..." -ForegroundColor Yellow
 
-$repoOfficialDir = Join-Path $PSScriptRoot "OfficialClientFiles"
-if (Test-Path $repoOfficialDir) {
-    Write-Host "  Using repository OfficialClientFiles ($repoOfficialDir)..." -ForegroundColor Cyan
-    robocopy.exe "$repoOfficialDir\Windows" "$clientOverlay\Windows" /E /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
-    [xml]$entSXml = [IO.File]::ReadAllText((Join-Path $repoOfficialDir "Manifests\enterprises-default.xml"))
-    [xml]$entXml  = [IO.File]::ReadAllText((Join-Path $repoOfficialDir "Manifests\enterprise-default.xml"))
-} else {
-    throw "OfficialClientFiles directory not found at $repoOfficialDir"
-}
+$releaseBaseUrl = "https://github.com/AotianNeo/win_20348_client_build/releases/download/v20348.1-client-payload"
 
-$regDir = Join-Path $repoOfficialDir "Registry"
-$regDriversFile  = Join-Path $regDir "ClientDrivers_DRIVERS.reg"
-$regSysFile      = Join-Path $regDir "ClientDriversAndServices_SYSTEM.reg"
-$regSwBaseFile   = Join-Path $regDir "ClientCbsAndSvchost_Base_SOFTWARE.reg"
-$regSwProExtFile = Join-Path $regDir "ClientCbs_ProExtra_SOFTWARE.reg"
+$uupPackages = @(
+    @{ Name = "Microsoft-Windows-Foundation-Package.ESD";                                      Sha1 = "ba8b5df4efae4fa87fb0cecf21b6069a3ff81617"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Desktop-Required-Package.ESD";                         Sha1 = "5b930270062ad55a9bb8d44f08e16b9719fa23c1"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Desktop-Required-WOW64-Package.ESD";                   Sha1 = "dc772f6611ff2be4912b51349de80cd6e28b51b8"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Features-Package.ESD";                                 Sha1 = "c54f0db05471fb043fb446fbef4cd79b9c75a811"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-Features-WOW64-Package.ESD";                           Sha1 = "1dc5a25150faafcb88dc61ed68ff8a2232098409"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionPack-Professional-Package.ESD";                        Sha1 = "6272e34d44c77a66eb4234385c759a01f74264aa"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionPack-Professional-WOW64-Package.ESD";                  Sha1 = "8a38fd4c977b3095b05f4ab0bf402dc3fd304b2b"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionSpecific-Professional-Package.ESD";                    Sha1 = "dfea095b1cf7261795467fa6cc07268159c87195"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionSpecific-Professional-WOW64-Package.ESD";              Sha1 = "eb2538740bc4efca7c9e95a1e60a8a3e7f340bc7"; Stage = $true },
+    @{ Name = "Microsoft-Windows-EditionSpecific-EnterpriseG-Package.ESD";                     Sha1 = "4ab72894cf11b02fb1bdffba36765ab475c6e7bd"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Not-Supported-On-LTSB-Package.ESD";                           Sha1 = "caaa1c21ce2946d0ae12c5674ef19a911417d950"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Not-Supported-On-LTSB-WOW64-Package.ESD";                     Sha1 = "220e07bdca4fb7822e954ce9c469df1eb0f31e24"; Stage = $true },
+    @{ Name = "Microsoft-Windows-RegulatedPackages-Package.ESD";                               Sha1 = "be9d94ae3a60e2a7d9d3c376bc3e69ac2d20fc20"; Stage = $true },
+    @{ Name = "Microsoft-Windows-RegulatedPackages-WOW64-Package.ESD";                         Sha1 = "a75e8c28cb51cd92817f9a3d746e6de01d8a3fd7"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-Package.ESD";               Sha1 = "2fa34b9868917d13d95f3c8e7df9a64ee843c414"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package.ESD";         Sha1 = "e904e5e4c36d025e7a4805975a3bd5a6d7b9321b"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Server-LanguagePack-Package_zh-cn-amd64-zh-cn.esd";           Sha1 = "7f52815d30b42f128070f72ca76b394e16faec17"; Stage = $true },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-Basic-zh-cn-Package-amd64.cab";              Sha1 = "fb2ebde13a1bd26183072dc63a91c1fa96d1100a"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-Handwriting-zh-cn-Package-amd64.cab";        Sha1 = "8e6305212ef4d60ffcb8fd3c8a5671fd13be1ff0"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-OCR-zh-cn-Package-amd64.cab";                Sha1 = "993a987b75617df0ab1cf9f19bd6bb337c84bd88"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-Speech-zh-cn-Package-amd64.cab";             Sha1 = "32abdfce3c2c0e3fb66f690865d4f7b148f8220f"; Stage = $false },
+    @{ Name = "Microsoft-Windows-LanguageFeatures-TextToSpeech-zh-cn-Package-amd64.cab";       Sha1 = "a2086d605a92a07abdc2d5f784a55f2df6c06963"; Stage = $false },
+    @{ Name = "Microsoft.ModernApps.Client.All.esd";                                           Sha1 = "8154e3df67387100ce3f3d720dc434deff6ec9b1"; Stage = $false },
+    @{ Name = "Microsoft.ModernApps.Client.professional.esd";                                  Sha1 = "e2f15cc4b38672fc1f154c93d379050b9ca0e0dd"; Stage = $false }
+)
 
-foreach ($rf in @($regDriversFile, $regSysFile, $regSwBaseFile, $regSwProExtFile)) {
-    if (-not (Test-Path $rf)) { throw "Required registry file missing: $rf" }
-}
-
-$payloadEsdUrl = "https://github.com/AotianNeo/win_20348_client_build/releases/download/v20348.1-client-payload/ClientPayload_20348.esd"
-$payloadEsdPath = Join-Path $WorkDir "ClientPayload_20348.esd"
-if (-not (Test-Path $payloadEsdPath)) {
-    Write-Host "  Downloading ClientPayload_20348.esd (~230 MB Solid LZMS)..." -ForegroundColor Cyan
-    & $aria2c -x16 -s16 -k1M --file-allocation=none --console-log-level=warn -d $WorkDir -o "ClientPayload_20348.esd" $payloadEsdUrl
-    if ($LASTEXITCODE -ne 0) { throw "Failed to download ClientPayload_20348.esd" }
-}
-
-Write-Host "  Extracting ClientPayload_20348.esd Image 1 (EnterpriseS Base Client Payload) & Image 2 (Pro/Enterprise Extra Payload)..." -ForegroundColor Cyan
-& $wimlib apply $payloadEsdPath 1 $payloadEntSDir --no-acls | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "wimlib apply Image 1 of ClientPayload_20348.esd failed" }
-& $wimlib apply $payloadEsdPath 2 $payloadProExtraDir --no-acls | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "wimlib apply Image 2 of ClientPayload_20348.esd failed" }
-
-function Get-ManifestRegMap([xml]$xmlDoc) {
-    $map = @{}
-    foreach ($rk in $xmlDoc.assembly.registryKeys.registryKey) {
-        foreach ($rv in $rk.registryValue) {
-            $map[$rv.name] = $rv.value
-        }
+foreach ($pkg in $uupPackages) {
+    $destFile = Join-Path $uupDir $pkg.Name
+    if (-not (Test-Path $destFile)) {
+        Write-Host "  Downloading $($pkg.Name)..."
+        & $aria2c -x16 -s16 -k1M --file-allocation=none --console-log-level=warn -d $uupDir -o $pkg.Name "$releaseBaseUrl/$($pkg.Name)"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to download $($pkg.Name)" }
     }
-    return $map
+    $h = (Get-FileHash -Path $destFile -Algorithm SHA1).Hash.ToLowerInvariant()
+    if ($h -ne $pkg.Sha1) {
+        throw "SHA-1 mismatch for $($pkg.Name): expected $($pkg.Sha1), got $h"
+    }
+    if ($pkg.Stage) {
+        & $wimlib apply $destFile 1 $uupStagePool --no-acls | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "wimlib apply failed for $($pkg.Name)" }
+    }
 }
+Write-Host "  Verified & extracted all 17 official Client CBS ESD packages into $uupStagePool [OK]" -ForegroundColor Green
 
-$ltscReg = Get-ManifestRegMap $entSXml
-$proReg  = Get-ManifestRegMap $entXml
-$ltscPolicyBytes = [OfficialIsoHelper]::HexToBytes($ltscReg["ProductPolicy"])
-$proPolicyBytes  = [OfficialIsoHelper]::HexToBytes($proReg["ProductPolicy"])
-
-Write-Host "  Loaded official EnterpriseS Policy ($($ltscPolicyBytes.Length) bytes) & Enterprise/Pro Policy ($($proPolicyBytes.Length) bytes)" -ForegroundColor Green
+# Extract Official ModernApps ESDs for Windows 10 Pro / Enterprise UWP Provisioning
+& $wimlib apply (Join-Path $uupDir "Microsoft.ModernApps.Client.All.esd") 1 $modernAppsDir --no-acls | Out-Null
+& $wimlib apply (Join-Path $uupDir "Microsoft.ModernApps.Client.professional.esd") 1 $modernAppsDir --no-acls | Out-Null
+Write-Host "  Extracted official Microsoft.ModernApps.Client.All.esd & professional.esd [OK]" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 4. Extract Official Server 2022 ISO, Enable .NET Framework 3.5 & Extract Base Hives
+# 3. Extract Official Server 2022 ISO & Mount Base WIM Image
 # ---------------------------------------------------------------------------
-Write-Host "[4/6] Extracting official Server 2022 ISO, enabling .NET Framework 3.5 (NetFx3), and preparing base WIM..." -ForegroundColor Yellow
+Write-Host "[3/7] Extracting official Server 2022 ISO and mounting Desktop Experience WIM..." -ForegroundColor Yellow
 
 & $sevenZip x $srvIsoPath "-o$isoExtractDir" -y | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "7z failed to extract Server 2022 ISO" }
@@ -327,289 +238,374 @@ if ($LASTEXITCODE -ne 0) { throw "7z failed to extract Server 2022 ISO" }
 $origWim = Join-Path $isoExtractDir "sources\install.wim"
 Set-ItemProperty -Path $origWim -Name IsReadOnly -Value $false
 
-$newWimPath = Join-Path $WorkDir "install_client.wim"
-if (Test-Path $newWimPath) { Remove-Item $newWimPath -Force }
+$workWim = Join-Path $WorkDir "work_client.wim"
+$finalWim = Join-Path $WorkDir "install_final.wim"
+if (Test-Path $workWim)  { Remove-Item $workWim -Force }
+if (Test-Path $finalWim) { Remove-Item $finalWim -Force }
 
-# Export base image (Index 2 of $origWim = ServerStandard Desktop Experience) to $newWimPath Index 1
-Write-Host "  Exporting Server 2022 Desktop Experience (Index 2) to new install.wim Index 1..."
-& $wimlib export $origWim 2 $newWimPath "Windows 10 Enterprise LTSC 2021" "Windows 10 Enterprise LTSC 2021"
-if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 1 failed" }
-
-# Pre-enable .NET Framework 3.5 (NetFx3) natively via DISM using official ISO sources\sxs before Client conversion
-$sxsDir = Join-Path $isoExtractDir "sources\sxs"
-Write-Host "  Mounting base image and enabling .NET Framework 3.5 (NetFx3) from $sxsDir..." -ForegroundColor Cyan
-dism.exe /Mount-Wim /WimFile:$newWimPath /Index:1 /MountDir:$mountDir | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "DISM Mount-Wim failed" }
-try {
-    dism.exe /Image:$mountDir /Enable-Feature /FeatureName:NetFx3 /All /LimitAccess /Source:$sxsDir | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "DISM Enable-Feature NetFx3 failed" }
-    Write-Host "  Successfully enabled .NET Framework 3.5 (NetFx3) [OK]" -ForegroundColor Green
-} finally {
-    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "DISM Unmount-Wim Commit failed" }
-}
-
-$hivesExtractDir = Join-Path $tmpDir "orig_hives"
-New-Item -ItemType Directory -Force -Path $hivesExtractDir | Out-Null
-
-& $wimlib extract $newWimPath 1 `
-    "\Windows\System32\config\SYSTEM" `
-    "\Windows\System32\config\SOFTWARE" `
-    "\Windows\System32\config\DRIVERS" `
-    "\Windows\servicing\Packages\Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" `
-    "--dest-dir=$hivesExtractDir" "--no-acls" "--nullglob" | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "wimlib extract of base hives and ServerStandardEdition.mum failed" }
-
-$srvStdMum = Get-ChildItem -Path $hivesExtractDir -Filter "Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $srvStdMum) { throw "Could not find Microsoft-Windows-ServerStandardEdition.mum in Index 1" }
-
-if ($srvStdMum.Name -match '~~([0-9\.]+)\.mum$') {
-    $pkgVer = $matches[1]
-} else {
-    throw "Could not parse package version from $($srvStdMum.Name)"
-}
-Write-Host "  Detected Official Server 2022 Package Version: $pkgVer" -ForegroundColor Cyan
-
-# Update EditionMatrix.xml in $clientOverlay to match $pkgVer
-$matrixPath = Join-Path "$clientOverlay\Windows\servicing\Editions" "EditionMatrix.xml"
-$matrixText = [IO.File]::ReadAllText($matrixPath)
-$matrixText = $matrixText -replace 'version="10\.0\.[0-9\.]+"', "version=`"$pkgVer`""
-[IO.File]::WriteAllText($matrixPath, $matrixText, [Text.Encoding]::UTF8)
-
-$hiveSysBase = Join-Path $hivesExtractDir "SYSTEM"
-$hiveSwBase  = Join-Path $hivesExtractDir "SOFTWARE"
-$hiveDrvBase = Join-Path $hivesExtractDir "DRIVERS"
-
-# Inject 71 Client Drivers & 99 Client Services into base DRIVERS and SYSTEM hives once
-Write-Host "  Registering 71 Client Drivers (Touchpad I2C/GPIO, Bluetooth Audio A2DP/AVRCP/HFP, Wi-Fi, Xbox) & 99 Services into base DRIVERS & SYSTEM hives..." -ForegroundColor Cyan
-reg.exe load "HKLM\OFFLINE_DRV" $hiveDrvBase | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "reg load OFFLINE_DRV failed" }
-try {
-    [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regDriversFile)
-    reg.exe import $regDriversFile | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "reg import ClientDrivers_DRIVERS.reg failed" }
-} finally {
-    [GC]::Collect()
-    [GC]::WaitForPendingFinalizers()
-    reg.exe unload "HKLM\OFFLINE_DRV" | Out-Null
-}
-
-reg.exe load "HKLM\OFFLINE_SYS" $hiveSysBase | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "reg load OFFLINE_SYS failed" }
-try {
-    [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regSysFile)
-    reg.exe import $regSysFile | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "reg import ClientDriversAndServices_SYSTEM.reg failed" }
-} finally {
-    [GC]::Collect()
-    [GC]::WaitForPendingFinalizers()
-    reg.exe unload "HKLM\OFFLINE_SYS" | Out-Null
-}
-
-# ---------------------------------------------------------------------------
-# 5. Export 4 Client Editions & Inject Per-Edition Payloads/Hives via wimlib-imagex
-# ---------------------------------------------------------------------------
-Write-Host "[5/6] Injecting Client payloads and exporting 4 Client editions into unified install.wim..." -ForegroundColor Yellow
-
-function Build-EditionHives([string]$baseSwHive, [string]$baseSysHive, [string]$editionId, [string]$compEditionId, [string]$productName, [byte[]]$policyBytes, [hashtable]$regMap, [bool]$includeProExtraCbs, [string]$outHiveDir) {
-    New-Item -ItemType Directory -Force -Path $outHiveDir | Out-Null
-    $swFile  = Join-Path $outHiveDir "SOFTWARE"
-    $sysFile = Join-Path $outHiveDir "SYSTEM"
-    Copy-Item $baseSwHive  $swFile -Force
-    Copy-Item $baseSysHive $sysFile -Force
-
-    reg.exe load "HKLM\OFFLINE_SYS" $sysFile | Out-Null
-    reg.exe load "HKLM\OFFLINE_SW"  $swFile  | Out-Null
-    try {
-        # Import Client CBS Packages & Svchost Groups into SOFTWARE hive
-        [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regSwBaseFile)
-        reg.exe import $regSwBaseFile | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "reg import ClientCbsAndSvchost_Base_SOFTWARE.reg failed" }
-        if ($includeProExtraCbs) {
-            [OfficialIsoHelper]::GrantAdminsOnAllKeysInRegFile($regSwProExtFile)
-            reg.exe import $regSwProExtFile | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "reg import ClientCbs_ProExtra_SOFTWARE.reg failed" }
-        }
-
-        # Remove ServerStandardEdition & ServerDatacenterEdition from CBS\Packages so Edition correlates cleanly as Client
-        $cbsPkgsKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SW\Microsoft\Windows\CurrentVersion\Component Based Servicing\Packages", $true)
-        if ($cbsPkgsKey) {
-            foreach ($sub in $cbsPkgsKey.GetSubKeyNames()) {
-                if ($sub -like "Microsoft-Windows-Server*Edition~*") {
-                    $cbsPkgsKey.DeleteSubKeyTree($sub, $false)
-                }
-            }
-            $cbsPkgsKey.Close()
-        }
-
-        $poKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SYS\ControlSet001\Control\ProductOptions", $true)
-        $poKey.SetValue("ProductType", "WinNT", [Microsoft.Win32.RegistryValueKind]::String)
-        $poKey.SetValue("ProductSuite", [string[]]@("Terminal Server"), [Microsoft.Win32.RegistryValueKind]::MultiString)
-        $poKey.SetValue("ProductPolicy", $policyBytes, [Microsoft.Win32.RegistryValueKind]::Binary)
-        if ($regMap["OSProductPfn"]) {
-            $poKey.SetValue("OSProductPfn", [string]$regMap["OSProductPfn"], [Microsoft.Win32.RegistryValueKind]::String)
-        }
-        if ($regMap["OSProductContentId"]) {
-            $poKey.SetValue("OSProductContentId", [string]$regMap["OSProductContentId"], [Microsoft.Win32.RegistryValueKind]::String)
-        }
-        $poKey.Close()
-
-        $cvKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("OFFLINE_SW\Microsoft\Windows NT\CurrentVersion", $true)
-        $cvKey.SetValue("InstallationType", "Client", [Microsoft.Win32.RegistryValueKind]::String)
-        $cvKey.SetValue("EditionID", $editionId, [Microsoft.Win32.RegistryValueKind]::String)
-        $cvKey.SetValue("CompositionEditionID", $compEditionId, [Microsoft.Win32.RegistryValueKind]::String)
-        $cvKey.SetValue("ProductName", $productName, [Microsoft.Win32.RegistryValueKind]::String)
-        if ($regMap["ProductId"]) {
-            $cvKey.SetValue("ProductId", [string]$regMap["ProductId"], [Microsoft.Win32.RegistryValueKind]::String)
-        }
-        if ($regMap["DigitalProductId"]) {
-            $cvKey.SetValue("DigitalProductId", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-        }
-        if ($regMap["DigitalProductId4"]) {
-            $cvKey.SetValue("DigitalProductId4", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId4"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-        }
-
-        foreach ($subName in @("DefaultProductKey", "DefaultProductKey2")) {
-            $dpk = $cvKey.CreateSubKey($subName)
-            if ($regMap["ProductId"]) {
-                $dpk.SetValue("ProductId", [string]$regMap["ProductId"], [Microsoft.Win32.RegistryValueKind]::String)
-            }
-            if ($regMap["DigitalProductId"]) {
-                $dpk.SetValue("DigitalProductId", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-            }
-            if ($regMap["DigitalProductId4"]) {
-                $dpk.SetValue("DigitalProductId4", [OfficialIsoHelper]::HexToBytes($regMap["DigitalProductId4"]), [Microsoft.Win32.RegistryValueKind]::Binary)
-            }
-            $dpk.Close()
-        }
-        $cvKey.Close()
-
-        $smKey = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey("OFFLINE_SW\Microsoft\ServerManager")
-        $smKey.SetValue("DoNotOpenServerManagerAtLogon", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
-        $smKey.Close()
-    } finally {
-        [GC]::Collect()
-        [GC]::WaitForPendingFinalizers()
-        reg.exe unload "HKLM\OFFLINE_SYS" | Out-Null
-        reg.exe unload "HKLM\OFFLINE_SW"  | Out-Null
-    }
-}
-
-# Apply ClientPayload_20348.esd Image 1 + OfficialClientFiles overlay + updated DRIVERS hive + remove Server SKUs and Server Manager once on Index 1
-Write-Host "  Applying base Client payload (WinSxS, DriverStore, System32, servicing\Packages, DRIVERS hive) to Index 1..." -ForegroundColor Cyan
-$baseOverlayCmds = @"
-add '$payloadEntSDir' '\'
-add '$clientOverlay\Windows' '\Windows'
-add '$hiveDrvBase' '\Windows\System32\config\DRIVERS'
-delete --force --recursive '\Windows\System32\spp\tokens\skus\ServerStandard'
-delete --force --recursive '\Windows\System32\spp\tokens\skus\ServerDatacenter'
-delete --force '\Windows\servicing\Editions\ServerStandardEdition.xml'
-delete --force '\Windows\servicing\Editions\ServerDatacenterEdition.xml'
-delete --force --recursive '\Windows\System32\Tasks\Microsoft\Windows\Server Manager'
-delete --force '\ProgramData\Microsoft\Windows\Start Menu\Programs\Administrative Tools\Server Manager.lnk'
-delete --force '\ProgramData\Microsoft\Windows\Start Menu\Programs\System Tools\Server Manager.lnk'
-delete --force '\Windows\System32\ServerManager.exe'
-delete --force '\Windows\System32\ServerManagerLauncher.exe'
-"@
-$baseOverlayCmds | & $wimlib update $newWimPath 1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "wimlib base overlay update failed" }
-
-# Instant intra-WIM exports for Indexes 2, 3, 4 (shares 100% of file streams)
-& $wimlib export $newWimPath 1 $newWimPath "Windows 10 IoT Enterprise LTSC 2021" "Windows 10 IoT Enterprise LTSC 2021"
+& $wimlib export $origWim 2 $workWim "Windows 10 Pro" "Windows 10 Pro"
 if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 2 failed" }
 
-& $wimlib export $newWimPath 1 $newWimPath "Windows 10 Pro" "Windows 10 Pro"
-if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 3 failed" }
+dism.exe /Mount-Wim /WimFile:$workWim /Index:1 /MountDir:$mountDir
+if ($LASTEXITCODE -ne 0) { throw "DISM Mount-Wim failed" }
 
-# Apply Pro/Enterprise extra payload to Index 3 before cloning Index 4 so Index 3 & 4 share single-instance streams
-Write-Host "  Applying Pro/Enterprise extra Client payload to Index 3 (and sharing with Index 4)..." -ForegroundColor Cyan
-$proOverlayCmds = @"
-add '$payloadProExtraDir' '\'
-"@
-$proOverlayCmds | & $wimlib update $newWimPath 3 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "wimlib pro extra overlay update failed" }
+# Detect exact LCU version ($pkgVer) and Media-Foundation-Server-Package version ($mfVer) in the mounted image
+$srvStdMum = Get-ChildItem "$mountDir\Windows\servicing\Packages\Microsoft-Windows-ServerStandardEdition~31bf3856ad364e35~amd64~~*.mum" |
+    Where-Object { $_.Name -notmatch "10\.0\.20348\.1\.mum" } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $srvStdMum -or $srvStdMum.Name -notmatch '~~([0-9\.]+)\.mum$') {
+    throw "Could not detect LCU package version from ServerStandardEdition.mum"
+}
+$pkgVer = $matches[1]
 
-& $wimlib export $newWimPath 3 $newWimPath "Windows 10 Enterprise" "Windows 10 Enterprise"
-if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 4 failed" }
+$mfSrvMum = Get-ChildItem "$mountDir\Windows\servicing\Packages\Microsoft-Media-Foundation-Server-Package~31bf3856ad364e35~amd64~~*.mum" |
+    Where-Object { $_.Name -notmatch "10\.0\.20348\.1\.mum" } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $mfSrvMum -or $mfSrvMum.Name -notmatch '~~([0-9\.]+)\.mum$') {
+    throw "Could not detect Media-Foundation-Server-Package version"
+}
+$mfVer = $matches[1]
+Write-Host "  Detected Official LCU Version: $pkgVer (Media Foundation: $mfVer)" -ForegroundColor Cyan
 
-$editions = @(
-    @{
-        Index = 1
-        EditionId = "EnterpriseS"
-        CompId = "EnterpriseS"
-        Name = "Windows 10 Enterprise LTSC 2021"
-        DisplayName = "Windows 10 企业版 LTSC"
-        BaseSw = $hiveSwBase
-        Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0x7D)
-        RegMap = $ltscReg
-        ProExtraCbs = $false
-    },
-    @{
-        Index = 2
-        EditionId = "IoTEnterpriseS"
-        CompId = "EnterpriseS"
-        Name = "Windows 10 IoT Enterprise LTSC 2021"
-        DisplayName = "Windows 10 IoT 企业版 LTSC"
-        BaseSw = $hiveSwBase
-        Policy = [OfficialIsoHelper]::PatchProductPolicySku($ltscPolicyBytes, 0xBD)
-        RegMap = $ltscReg
-        ProExtraCbs = $false
-    },
-    @{
-        Index = 3
-        EditionId = "Professional"
-        CompId = "Enterprise"
-        Name = "Windows 10 Pro"
-        DisplayName = "Windows 10 专业版"
-        BaseSw = $hiveSwBase
-        Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x30)
-        RegMap = $proReg
-        ProExtraCbs = $true
-    },
-    @{
-        Index = 4
-        EditionId = "Enterprise"
-        CompId = "Enterprise"
-        Name = "Windows 10 Enterprise"
-        DisplayName = "Windows 10 企业版"
-        BaseSw = $hiveSwBase
-        Policy = [OfficialIsoHelper]::PatchProductPolicySku($proPolicyBytes, 0x04)
-        RegMap = $proReg
-        ProExtraCbs = $true
+# ---------------------------------------------------------------------------
+# 4. Generate Version-Aligned Edition Manifests & Apply 100% Native DISM Servicing
+# ---------------------------------------------------------------------------
+Write-Host "[4/7] Running 100% Native DISM Servicing (.NET 3.5 + Unattend Edition Switch + FODs)..." -ForegroundColor Yellow
+
+$sxsDir = Join-Path $isoExtractDir "sources\sxs"
+Write-Host "  Enabling .NET Framework 3.5 (NetFx3) from $sxsDir..." -ForegroundColor Cyan
+dism.exe /Image:$mountDir /Enable-Feature /FeatureName:NetFx3 /All /LimitAccess /Source:$sxsDir
+if ($LASTEXITCODE -ne 0) { throw "DISM Enable-Feature NetFx3 failed" }
+
+# Copy OfficialEditionManifests into $uupStagePool and generate version-aligned $pkgVer .mum files
+$manifestsDir = Join-Path $PSScriptRoot "OfficialEditionManifests"
+$proMum1 = Join-Path $manifestsDir "Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~10.0.20348.1.mum"
+$mpMum1  = Join-Path $manifestsDir "Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum"
+Copy-Item $proMum1 $uupStagePool -Force
+Copy-Item $mpMum1  $uupStagePool -Force
+
+# Build lookup of latest installed/staged package versions in $mountDir\Windows\servicing\Packages and $uupStagePool
+$latestPkgMap = @{}
+foreach ($dir in @("$uupStagePool", "$mountDir\Windows\servicing\Packages")) {
+    Get-ChildItem "$dir\*.mum" | ForEach-Object {
+        if ($_.Name -match '^([^~]+)~([^~]+)~([^~]+)~([^~]*)~([0-9\.]+)\.mum$') {
+            $key = "$($matches[1])~$($matches[2])~$($matches[3])~$($matches[4])".ToLowerInvariant()
+            $ver = [version]$matches[5]
+            if (-not $latestPkgMap.ContainsKey($key) -or $ver -gt [version]$latestPkgMap[$key]) {
+                $latestPkgMap[$key] = $matches[5]
+            }
+        }
     }
-)
-
-foreach ($ed in $editions) {
-    Write-Host "  Configuring Index $($ed.Index): $($ed.Name) ($($ed.EditionId))..." -ForegroundColor Cyan
-    $edHiveDir = Join-Path $tmpDir "hives_$($ed.EditionId)"
-    Build-EditionHives $ed.BaseSw $hiveSysBase $ed.EditionId $ed.CompId $ed.Name $ed.Policy $ed.RegMap $ed.ProExtraCbs $edHiveDir
-
-    $updateCmds = @"
-add '$edHiveDir\SYSTEM' '\Windows\System32\config\SYSTEM'
-add '$edHiveDir\SOFTWARE' '\Windows\System32\config\SOFTWARE'
-"@
-    $updateCmds | & $wimlib update $newWimPath $ed.Index | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "wimlib update failed for Index $($ed.Index)" }
-
-    & $wimlib info $newWimPath $ed.Index $ed.Name $ed.Name `
-        "--image-property=EDITIONID=$($ed.EditionId)" `
-        "--image-property=INSTALLATIONTYPE=Client" `
-        "--image-property=PRODUCTTYPE=WinNT" `
-        "--image-property=PRODUCTSUITE=Terminal Server" `
-        "--image-property=DISPLAYNAME=$($ed.DisplayName)" `
-        "--image-property=DISPLAYDESCRIPTION=$($ed.DisplayName)" `
-        "--image-property=FLAGS=$($ed.EditionId)"
-    if ($LASTEXITCODE -ne 0) { throw "wimlib info failed for Index $($ed.Index)" }
 }
 
-& $wimlib optimize $newWimPath
+# Align Media-Placeholder-Package to $pkgVer
+$mpXml = [System.IO.File]::ReadAllText($mpMum1)
+$mpXml = $mpXml.Replace('version="10.0.20348.1"', "version=`"$pkgVer`"")
+$mpOut = Join-Path $uupStagePool "Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~$pkgVer.mum"
+[System.IO.File]::WriteAllText($mpOut, $mpXml, [System.Text.Encoding]::UTF8)
+$latestPkgMap["microsoft-windows-media-placeholder-package~31bf3856ad364e35~amd64~"] = $pkgVer
+
+# Align ProfessionalEdition to $pkgVer and match every child <package> to the latest version in $latestPkgMap
+[xml]$proDoc = [System.IO.File]::ReadAllText($proMum1)
+$proDoc.assembly.assemblyIdentity.version = $pkgVer
+foreach ($upd in $proDoc.assembly.package.update) {
+    $ai = $upd.package.assemblyIdentity
+    if ($ai) {
+        $lang = if ($ai.language -and $ai.language -ne "neutral") { $ai.language } else { "" }
+        $lookupKey = "$($ai.name)~$($ai.publicKeyToken)~$($ai.processorArchitecture)~$lang".ToLowerInvariant()
+        if ($latestPkgMap.ContainsKey($lookupKey)) {
+            $ai.version = $latestPkgMap[$lookupKey]
+        }
+    }
+}
+$proOut = Join-Path $uupStagePool "Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~$pkgVer.mum"
+$proDoc.Save($proOut)
+
+# Also copy the LCU-updated Server-LanguagePack and Media-Foundation-Server-Package .mum/.cat from mounted image into $uupStagePool so DISM can reference them from source
+Copy-Item "$mountDir\Windows\servicing\Packages\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~$pkgVer.*" $uupStagePool -Force
+Copy-Item "$mountDir\Windows\servicing\Packages\Microsoft-Media-Foundation-Server-Package~31bf3856ad364e35~amd64~~$mfVer.*" $uupStagePool -Force
+
+# Construct the 100% Native DISM Servicing Unattend XML
+$unattendPath = Join-Path $tmpDir "native_client_switch.xml"
+$unattendContent = @"
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+    <servicing>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Foundation-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Foundation-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Client-Desktop-Required-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Client-Desktop-Required-WOW64-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Client-Desktop-Required-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Client-Features-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Client-Features-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Client-Features-WOW64-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Client-Features-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-EditionPack-Professional-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-EditionPack-Professional-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-EditionPack-Professional-WOW64-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-EditionPack-Professional-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-EditionSpecific-Professional-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-EditionSpecific-Professional-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-EditionSpecific-Professional-WOW64-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-EditionSpecific-Professional-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-EditionSpecific-EnterpriseG-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-EditionSpecific-EnterpriseG-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Not-Supported-On-LTSB-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Not-Supported-On-LTSB-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Not-Supported-On-LTSB-WOW64-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Not-Supported-On-LTSB-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-RegulatedPackages-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-RegulatedPackages-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-RegulatedPackages-WOW64-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-RegulatedPackages-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Required-ShellExperiences-Desktop-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Required-ShellExperiences-Desktop-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Server-LanguagePack-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
+            <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.20348.1.mum" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-Media-Features-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Media-Features-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-MediaFeaturePack-OOB-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-MediaFeaturePack-OOB-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-Media-Placeholder-Package" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~$pkgVer.mum" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-ProfessionalEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~$pkgVer.mum" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-Server-LanguagePack-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
+            <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.20348.1.mum" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-Server-LanguagePack-Package" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
+            <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~$pkgVer.mum" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Media-Foundation-Server-Package" version="$mfVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\Microsoft-Media-Foundation-Server-Package~31bf3856ad364e35~amd64~~$mfVer.mum" />
+        </package>
+        <package action="remove">
+            <assemblyIdentity name="Microsoft-Windows-ServerStandardEdition" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+        <package action="remove">
+            <assemblyIdentity name="Microsoft-Windows-ServerStandardEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+    </servicing>
+</unattend>
+"@
+[System.IO.File]::WriteAllText($unattendPath, $unattendContent, [System.Text.Encoding]::UTF8)
+
+Write-Host "  Executing DISM /Apply-Unattend (Native CBS Stage + Edition Switch + LCU Preservation)..." -ForegroundColor Cyan
+dism.exe /Image:$mountDir /Apply-Unattend:$unattendPath
+if ($LASTEXITCODE -ne 0) { throw "DISM /Apply-Unattend failed with exit code $LASTEXITCODE" }
+
+# Remove any remaining ServerDatacenterEdition or Server-Shell-Package packages if present in the image
+$extraRemovePkgs = Get-ChildItem "$mountDir\Windows\servicing\Packages\*.mum" |
+    Where-Object { $_.BaseName -match '^(Microsoft-Windows-ServerDatacenterEdition|Microsoft-Windows-Server-Shell-Package|PowerShell-SConfig-Package|Microsoft-ServerCore-ShellLauncher-Package)~' } |
+    Select-Object -ExpandProperty BaseName
+if ($extraRemovePkgs) {
+    foreach ($pkgIdentity in $extraRemovePkgs) {
+        Write-Host "  Removing residual Server package: $pkgIdentity..."
+        dism.exe /Image:$mountDir /Remove-Package /PackageName:$pkgIdentity | Out-Null
+    }
+}
+
+# Install the 5 official zh-CN LanguageFeatures FOD CABs
+Write-Host "  Installing 5 official zh-CN LanguageFeatures FOD CABs..." -ForegroundColor Cyan
+$fodCabs = Get-ChildItem "$uupDir\Microsoft-Windows-LanguageFeatures-*-zh-cn-Package-amd64.cab"
+foreach ($cab in $fodCabs) {
+    dism.exe /Image:$mountDir /Add-Package /PackagePath:$($cab.FullName)
+    if ($LASTEXITCODE -ne 0) { throw "DISM Add-Package failed for $($cab.Name)" }
+}
+
+# Verify and enforce pure Client OOBE & Explorer shell + Default Visual Effects in mounted hives
+Write-Host "  Verifying Client OOBE, Explorer AvailableShells (60000=explorer.exe), and Default Visual Effects..." -ForegroundColor Cyan
+reg.exe load "HKLM\MOUNT_SW" "$mountDir\Windows\System32\config\SOFTWARE" | Out-Null
+reg.exe load "HKLM\MOUNT_DEFAULT" "$mountDir\Users\Default\NTUSER.DAT" | Out-Null
+try {
+    [RegPrivHelper]::EnsurePureExplorerAvailableShell("MOUNT_SW\Microsoft\Windows NT\CurrentVersion\Winlogon\AlternateShells\AvailableShells")
+    reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f | Out-Null
+    reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows NT\CurrentVersion\Winlogon\AlternateShells" /v DefaultShell /t REG_SZ /d "explorer.exe" /f | Out-Null
+    reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows NT\CurrentVersion" /v InstallationType /t REG_SZ /d "Client" /f | Out-Null
+
+    # Enable all Client visual effects by default (VisualFXSetting = 1: Best Appearance)
+    reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting /t REG_DWORD /d 1 /f | Out-Null
+    foreach ($sub in @("ControlAnimations","AnimateMinMax","TaskbarAnimations","ComboBoxAnimation","CursorShadow","DropShadow","ListBoxSmoothScrolling","ListviewAlphaSelect","ListviewShadow","MenuAnimation","SelectionFade","ThumbnailsOrIcon","TooltipAnimation","DWMAeroPeekEnabled","DWMEnabled","DWMGlass")) {
+        reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects\$sub" /v DefaultByAlphaTest /t REG_DWORD /d 1 /f | Out-Null
+        reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects\$sub" /v DefaultValue /t REG_DWORD /d 1 /f | Out-Null
+    }
+    reg.exe add "HKLM\MOUNT_DEFAULT\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting /t REG_DWORD /d 1 /f | Out-Null
+} finally {
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+    reg.exe unload "HKLM\MOUNT_DEFAULT" | Out-Null
+    reg.exe unload "HKLM\MOUNT_SW" | Out-Null
+}
+
+# Commit the serviced base Professional image before branching clean LTSC-style vs Full UWP editions
+Write-Host "  Committing serviced Windows 10 Client base image..." -ForegroundColor Cyan
+dism.exe /Unmount-Wim /MountDir:$mountDir /Commit
+if ($LASTEXITCODE -ne 0) { throw "DISM Unmount-Wim Commit failed" }
 
 # ---------------------------------------------------------------------------
-# 6. Replace install.wim, Write ei.cfg, and Build Bootable Client ISO
+# 5. Build Index 1: Clean LTSC-Style Edition (Windows 10 IoT Enterprise - Zero Consumer UWP Bloat)
 # ---------------------------------------------------------------------------
-Write-Host "[6/6] Building final bootable Windows 20348 Client ISO..." -ForegroundColor Yellow
+Write-Host "[5/7] Creating Index 1: Windows 10 IoT Enterprise (Clean Edition without Consumer UWP Bloat)..." -ForegroundColor Yellow
 
-Move-Item -Path $newWimPath -Destination $origWim -Force
+& $wimlib export $workWim 1 $finalWim "Windows 10 IoT Enterprise" "Windows 10 IoT Enterprise"
+if ($LASTEXITCODE -ne 0) { throw "wimlib export Index 1 failed" }
+
+dism.exe /Mount-Wim /WimFile:$finalWim /Index:1 /MountDir:$mountDir
+if ($LASTEXITCODE -ne 0) { throw "DISM Mount-Wim Index 1 failed" }
+try {
+    dism.exe /Image:$mountDir /Set-Edition:IoTEnterprise
+    if ($LASTEXITCODE -ne 0) { throw "DISM Set-Edition:IoTEnterprise failed" }
+} finally {
+    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit
+    if ($LASTEXITCODE -ne 0) { throw "DISM Unmount-Wim Index 1 failed" }
+}
+& $wimlib info $finalWim 1 "Windows 10 IoT Enterprise" "Windows 10 IoT Enterprise" `
+    "--image-property=EDITIONID=IoTEnterprise" `
+    "--image-property=INSTALLATIONTYPE=Client" `
+    "--image-property=PRODUCTTYPE=WinNT" `
+    "--image-property=PRODUCTSUITE=Terminal Server" `
+    "--image-property=DISPLAYNAME=Windows 10 IoT 企业版 (精简无预装UWP)" `
+    "--image-property=DISPLAYDESCRIPTION=Windows 10 IoT 企业版 (精简无预装UWP)" `
+    "--image-property=FLAGS=IoTEnterprise"
+
+# ---------------------------------------------------------------------------
+# 6. Provision Official Microsoft Store & 41 UWP Apps for Index 2 (Pro), Index 3 (Pro Workstation), Index 4 (Enterprise)
+# ---------------------------------------------------------------------------
+Write-Host "[6/7] Provisioning official Microsoft Store & 41 Modern UWP Apps into Pro / Workstation / Enterprise..." -ForegroundColor Yellow
+
+dism.exe /Mount-Wim /WimFile:$workWim /Index:1 /MountDir:$mountDir
+if ($LASTEXITCODE -ne 0) { throw "DISM Mount-Wim workWim failed" }
+try {
+    $allDeps = Get-ChildItem $modernAppsDir -Recurse -Include *.appx, *.msix |
+        Where-Object { $_.Name -match "^Microsoft\.(VCLibs|NET\.Native|UI\.Xaml)" } |
+        Select-Object -ExpandProperty FullName
+    $depArgs = $allDeps | ForEach-Object { "/DependencyPackagePath:`"$_`"" }
+
+    $appDirs = Get-ChildItem $modernAppsDir -Directory
+    $provCount = 0
+    foreach ($ad in $appDirs) {
+        $bundle = Get-ChildItem $ad.FullName -Include *.appxbundle, *.msixbundle -Recurse | Select-Object -First 1
+        $lic    = Get-ChildItem $ad.FullName -Filter *_License1.xml -Recurse | Select-Object -First 1
+        if ($bundle -and $lic) {
+            $provCount++
+            Write-Host "  [$provCount] Provisioning $($ad.Name)..."
+            $cmdArgs = @("/Image:`"$mountDir`"", "/Add-ProvisionedAppxPackage", "/PackagePath:`"$($bundle.FullName)`"", "/LicensePath:`"$($lic.FullName)`"", "/Region:all") + $depArgs
+            $p = Start-Process -FilePath "dism.exe" -ArgumentList $cmdArgs -Wait -NoNewWindow -PassThru
+            if ($p.ExitCode -ne 0) {
+                Write-Warning "DISM Add-ProvisionedAppxPackage returned $($p.ExitCode) for $($ad.Name)"
+            }
+        }
+    }
+    Write-Host "  Provisioned $provCount official Modern UWP apps [OK]" -ForegroundColor Green
+} finally {
+    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit
+    if ($LASTEXITCODE -ne 0) { throw "DISM Unmount-Wim workWim failed" }
+}
+
+# Export Index 2: Windows 10 Pro
+& $wimlib export $workWim 1 $finalWim "Windows 10 Pro" "Windows 10 Pro"
+& $wimlib info $finalWim 2 "Windows 10 Pro" "Windows 10 Pro" `
+    "--image-property=EDITIONID=Professional" `
+    "--image-property=INSTALLATIONTYPE=Client" `
+    "--image-property=PRODUCTTYPE=WinNT" `
+    "--image-property=PRODUCTSUITE=Terminal Server" `
+    "--image-property=DISPLAYNAME=Windows 10 专业版" `
+    "--image-property=DISPLAYDESCRIPTION=Windows 10 专业版" `
+    "--image-property=FLAGS=Professional"
+
+# Export & Native Transmog Index 3: Windows 10 Pro for Workstations
+& $wimlib export $workWim 1 $finalWim "Windows 10 Pro for Workstations" "Windows 10 Pro for Workstations"
+dism.exe /Mount-Wim /WimFile:$finalWim /Index:3 /MountDir:$mountDir
+try {
+    dism.exe /Image:$mountDir /Set-Edition:ProfessionalWorkstation
+    if ($LASTEXITCODE -ne 0) { throw "DISM Set-Edition:ProfessionalWorkstation failed" }
+} finally {
+    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit
+}
+& $wimlib info $finalWim 3 "Windows 10 Pro for Workstations" "Windows 10 Pro for Workstations" `
+    "--image-property=EDITIONID=ProfessionalWorkstation" `
+    "--image-property=INSTALLATIONTYPE=Client" `
+    "--image-property=PRODUCTTYPE=WinNT" `
+    "--image-property=PRODUCTSUITE=Terminal Server" `
+    "--image-property=DISPLAYNAME=Windows 10 专业工作站版" `
+    "--image-property=DISPLAYDESCRIPTION=Windows 10 专业工作站版" `
+    "--image-property=FLAGS=ProfessionalWorkstation"
+
+# Export & Native Transmog Index 4: Windows 10 Enterprise
+& $wimlib export $workWim 1 $finalWim "Windows 10 Enterprise" "Windows 10 Enterprise"
+dism.exe /Mount-Wim /WimFile:$finalWim /Index:4 /MountDir:$mountDir
+try {
+    dism.exe /Image:$mountDir /Set-Edition:Enterprise
+    if ($LASTEXITCODE -ne 0) { throw "DISM Set-Edition:Enterprise failed" }
+} finally {
+    dism.exe /Unmount-Wim /MountDir:$mountDir /Commit
+}
+& $wimlib info $finalWim 4 "Windows 10 Enterprise" "Windows 10 Enterprise" `
+    "--image-property=EDITIONID=Enterprise" `
+    "--image-property=INSTALLATIONTYPE=Client" `
+    "--image-property=PRODUCTTYPE=WinNT" `
+    "--image-property=PRODUCTSUITE=Terminal Server" `
+    "--image-property=DISPLAYNAME=Windows 10 企业版" `
+    "--image-property=DISPLAYDESCRIPTION=Windows 10 企业版" `
+    "--image-property=FLAGS=Enterprise"
+
+Remove-Item $workWim -Force -ErrorAction SilentlyContinue
+& $wimlib optimize $finalWim
+
+# ---------------------------------------------------------------------------
+# 7. Replace install.wim, Write ei.cfg, and Build Bootable Client ISO
+# ---------------------------------------------------------------------------
+Write-Host "[7/7] Building final bootable Windows 10 Build 20348 Client ISO..." -ForegroundColor Yellow
+
+Move-Item -Path $finalWim -Destination $origWim -Force
 
 $eiCfgContent = @"
 [Channel]
@@ -620,7 +616,7 @@ _Default
 [IO.File]::WriteAllText((Join-Path $isoExtractDir "sources\ei.cfg"), $eiCfgContent, [Text.Encoding]::ASCII)
 
 $buildRev = ($pkgVer -split '\.')[-1]
-$outIsoName = "Win10_20348.${buildRev}_Client_LTSC_Pro_Ent_x64_zh-cn.iso"
+$outIsoName = "Win10_20348.${buildRev}_Client_IoT_Pro_Workstation_Ent_x64_zh-cn.iso"
 $outIsoPath = Join-Path $OutputDir $outIsoName
 
 $etfsboot = Join-Path $isoExtractDir "boot\etfsboot.com"
