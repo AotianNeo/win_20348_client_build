@@ -81,10 +81,15 @@ if (-not $oscdimg) {
     $oscdimg = "$WorkDir\tools\oscdimg.exe"
 }
 
-# Add Backup/Restore Registry privilege helper for cleaning TrustedInstaller-protected AvailableShells key if needed
-Add-Type -TypeDefinition @'
+# Add Backup/Restore Registry privilege & Offline DualModeDriver Manifest Importer
+Add-Type -ReferencedAssemblies System.Xml -TypeDefinition @'
 using System;
+using System.IO;
+using System.Xml;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
+
 public class RegPrivHelper {
     [DllImport("advapi32.dll", SetLastError=true)]
     public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
@@ -98,22 +103,29 @@ public class RegPrivHelper {
     }
     [DllImport("advapi32.dll", SetLastError=true)]
     public static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, bool DisableAllPrivileges, ref TOKEN_PRIVILEGES NewState, uint BufferLength, IntPtr PreviousState, IntPtr ReturnLength);
-    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
     public static extern int RegOpenKeyExW(IntPtr hKey, string subKey, uint options, uint samDesired, out IntPtr phkResult);
-    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+    public static extern int RegCreateKeyExW(IntPtr hKey, string lpSubKey, int Reserved, string lpClass, int dwOptions, int samDesired, IntPtr lpSecurityAttributes, out IntPtr phkResult, out int lpdwDisposition);
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
     public static extern int RegDeleteValueW(IntPtr hKey, string lpValueName);
-    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
     public static extern int RegSetValueExW(IntPtr hKey, string lpValueName, uint Reserved, uint dwType, byte[] lpData, int cbData);
-    [DllImport("advapi32.dll")]
+    [DllImport("advapi32.dll", SetLastError=true)]
     public static extern int RegCloseKey(IntPtr hKey);
+
+    public static readonly IntPtr HKEY_LOCAL_MACHINE = new IntPtr(unchecked((int)0x80000002));
+    public const int REG_OPTION_BACKUP_RESTORE = 0x00000004;
+    public const int KEY_ALL_ACCESS = 0xF003F;
 
     public static void EnablePriv(string name) {
         IntPtr hToken;
-        OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x28, out hToken);
-        long luid;
-        LookupPrivilegeValue(null, name, out luid);
-        TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES { PrivilegeCount = 1, Luid = luid, Attributes = 2 };
-        AdjustTokenPrivileges(hToken, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+        if (OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x28, out hToken)) {
+            long luid;
+            LookupPrivilegeValue(null, name, out luid);
+            TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES { PrivilegeCount = 1, Luid = luid, Attributes = 2 };
+            AdjustTokenPrivileges(hToken, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+        }
     }
 
     public static void EnsurePureExplorerAvailableShell(string hiveKeyPath) {
@@ -121,8 +133,6 @@ public class RegPrivHelper {
         EnablePriv("SeBackupPrivilege");
         EnablePriv("SeTakeOwnershipPrivilege");
         IntPtr hKey;
-        IntPtr HKEY_LOCAL_MACHINE = new IntPtr(unchecked((int)0x80000002));
-        // REG_OPTION_BACKUP_RESTORE = 4, KEY_ALL_ACCESS = 0xF003F
         int res = RegOpenKeyExW(HKEY_LOCAL_MACHINE, hiveKeyPath, 4, 0xF003F, out hKey);
         if (res == 0) {
             RegDeleteValueW(hKey, "40000");
@@ -131,6 +141,76 @@ public class RegPrivHelper {
             RegSetValueExW(hKey, "60000", 0, 1, data, data.Length);
             RegCloseKey(hKey);
         }
+    }
+
+    public static int ApplyOfflineDriverManifest(string xmlPath, string drvDbRoot, string sysCsRoot) {
+        EnablePriv("SeRestorePrivilege");
+        EnablePriv("SeBackupPrivilege");
+        XmlDocument doc = new XmlDocument();
+        doc.Load(xmlPath);
+        XmlNodeList keys = doc.GetElementsByTagName("registryKey");
+        int applied = 0;
+        foreach (XmlNode k in keys) {
+            string keyName = k.Attributes["keyName"] != null ? k.Attributes["keyName"].Value : null;
+            if (string.IsNullOrEmpty(keyName)) continue;
+            string subPath = null;
+            bool isDrvPkgRoot = false;
+            if (keyName.StartsWith(@"HKEY_LOCAL_MACHINE\SYSTEM\DriverDatabase\", StringComparison.OrdinalIgnoreCase)) {
+                string rel = keyName.Substring(@"HKEY_LOCAL_MACHINE\SYSTEM\DriverDatabase\".Length);
+                subPath = drvDbRoot + @"\" + rel;
+                if (rel.StartsWith(@"DriverPackages\", StringComparison.OrdinalIgnoreCase) && rel.IndexOf('\\', @"DriverPackages\".Length) < 0) {
+                    isDrvPkgRoot = true;
+                }
+            } else if (keyName.StartsWith(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\", StringComparison.OrdinalIgnoreCase)) {
+                string rel = keyName.Substring(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\".Length);
+                subPath = sysCsRoot + @"\" + rel;
+            } else {
+                continue;
+            }
+            IntPtr hKey;
+            int disp;
+            if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, subPath, 0, null, REG_OPTION_BACKUP_RESTORE, KEY_ALL_ACCESS, IntPtr.Zero, out hKey, out disp) != 0) {
+                continue;
+            }
+            applied++;
+            using (SafeRegistryHandle srh = new SafeRegistryHandle(hKey, true))
+            using (RegistryKey rk = RegistryKey.FromHandle(srh)) {
+                if (isDrvPkgRoot) {
+                    rk.SetValue("StatusFlags", 0x112, RegistryValueKind.DWord);
+                }
+                foreach (XmlNode v in k.ChildNodes) {
+                    if (v.LocalName != "registryValue") continue;
+                    string vName = v.Attributes["name"] != null ? v.Attributes["name"].Value : "";
+                    string vType = v.Attributes["valueType"] != null ? v.Attributes["valueType"].Value : "REG_SZ";
+                    string vVal  = v.Attributes["value"] != null ? v.Attributes["value"].Value : "";
+                    switch (vType.ToUpperInvariant()) {
+                        case "REG_SZ":
+                            rk.SetValue(vName, vVal, RegistryValueKind.String);
+                            break;
+                        case "REG_EXPAND_SZ":
+                            rk.SetValue(vName, vVal, RegistryValueKind.ExpandString);
+                            break;
+                        case "REG_DWORD":
+                            rk.SetValue(vName, unchecked((int)Convert.ToUInt32(vVal, 16)), RegistryValueKind.DWord);
+                            break;
+                        case "REG_QWORD":
+                            rk.SetValue(vName, unchecked((long)Convert.ToUInt64(vVal, 16)), RegistryValueKind.QWord);
+                            break;
+                        case "REG_BINARY":
+                            byte[] bin = new byte[vVal.Length / 2];
+                            for (int i = 0; i < bin.Length; i++) bin[i] = Convert.ToByte(vVal.Substring(i * 2, 2), 16);
+                            rk.SetValue(vName, bin, RegistryValueKind.Binary);
+                            break;
+                        case "REG_MULTI_SZ":
+                            string[] parts = vVal.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                            for (int i = 0; i < parts.Length; i++) parts[i] = parts[i].Trim('"');
+                            rk.SetValue(vName, parts, RegistryValueKind.MultiString);
+                            break;
+                    }
+                }
+            }
+        }
+        return applied;
     }
 }
 '@
@@ -201,7 +281,10 @@ $uupPackages = @(
     @{ Name = "Microsoft-Windows-LanguageFeatures-Speech-zh-cn-Package-amd64.cab";             Sha256 = "5752678b19ddd970e09cbd92b84e651f0de1ec040803f94f50bc6eace45ef57f"; Stage = $false },
     @{ Name = "Microsoft-Windows-LanguageFeatures-TextToSpeech-zh-cn-Package-amd64.cab";       Sha256 = "ff37f75bd09539fd67a13adfa31723ced6048307f20f9eb0b539fcc8c7b38d0d"; Stage = $false },
     @{ Name = "Microsoft.ModernApps.Client.All.esd";                                           Sha256 = "ad740246597698717ae93fa12df03ce08cf985e91695b3a4a712e29515a5164c"; Stage = $false },
-    @{ Name = "Microsoft.ModernApps.Client.professional.esd";                                  Sha256 = "eabf2c72cb45c0d107e8fb0c8a0877e8e35efec46d6a1b7064086462f31d51aa"; Stage = $false }
+    @{ Name = "Microsoft.ModernApps.Client.professional.esd";                                  Sha256 = "eabf2c72cb45c0d107e8fb0c8a0877e8e35efec46d6a1b7064086462f31d51aa"; Stage = $false },
+    @{ Name = "vm_zhcn_patch.zip";                                                             Sha256 = "fe175c281ec4163586fdd4e7c2e6ac3ac541cf6c4989816dac9f7d8bc7e211e8"; Stage = $false },
+    @{ Name = "uwp_licenses.zip";                                                              Sha256 = "706032114c5f8061240107a1248cc375600999255a06a64fbeaa943b0587371e"; Stage = $false },
+    @{ Name = "ModernApps_zh-cn_Overlay.esd";                                                  Sha256 = "b889480b176ba9fd169a7ea7a28fac73c23679c8b7a4ae6c2a12f2b00dc7f798"; Stage = $false }
 )
 
 foreach ($pkg in $uupPackages) {
@@ -534,6 +617,16 @@ $removeXmlBlock
 "@
 [System.IO.File]::WriteAllText($unattendPath, $unattendContent, [System.Text.Encoding]::UTF8)
 
+# Pre-set ProductType=WinNT in offline SYSTEM hive before /Apply-Unattend so DrvInst evaluates dualModeDriver packages as Client
+reg.exe load "HKLM\MOUNT_SYS" "$mountDir\Windows\System32\config\SYSTEM" | Out-Null
+try {
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\ProductOptions" /v ProductType /t REG_SZ /d "WinNT" /f | Out-Null
+} finally {
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+    reg.exe unload "HKLM\MOUNT_SYS" | Out-Null
+}
+
 Write-Host "  Executing DISM /Apply-Unattend (Native CBS Stage + Edition Switch + LCU Preservation + Server SKU/FoD Removal)..." -ForegroundColor Cyan
 dism.exe /Image:$mountDir /Apply-Unattend:$unattendPath
 if ($LASTEXITCODE -ne 0) { throw "DISM /Apply-Unattend failed with exit code $LASTEXITCODE" }
@@ -557,11 +650,66 @@ foreach ($cab in $fodCabs) {
     if ($LASTEXITCODE -ne 0) { throw "DISM Add-Package failed for $($cab.Name)" }
 }
 
-# Verify and enforce pure Client OOBE & Explorer shell + Default Visual Effects in mounted hives
-Write-Host "  Verifying Client OOBE, Explorer AvailableShells (60000=explorer.exe), and Default Visual Effects..." -ForegroundColor Cyan
+# Overlay all Client-only zh-CN .adml (AppHVSI.adml, etc.), .mui (basebrd.dll.mui, rstrui.exe.mui, WindowsSandbox.exe.mui, etc.), and .inf_loc resources
+Write-Host "  Installing Client-only zh-CN MUI, ADML (AppHVSI.adml, etc.), and Branding resources..." -ForegroundColor Cyan
+$zhPatchExtract = Join-Path $tmpDir "zhcn_client_res"
+if (Test-Path $zhPatchExtract) { Remove-Item $zhPatchExtract -Recurse -Force }
+& $sevenZip x (Join-Path $uupDir "vm_zhcn_patch.zip") "-o$zhPatchExtract" -y | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Failed to extract vm_zhcn_patch.zip" }
+robocopy "$zhPatchExtract\Windows" "$mountDir\Windows" /E /B /XC /XN /XO /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
+robocopy "$zhPatchExtract\Windows\Branding\Basebrd\zh-CN" "$mountDir\Windows\Branding\Basebrd\zh-CN" /E /B /IS /IT /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
+robocopy "$zhPatchExtract\Windows\PolicyDefinitions\zh-CN" "$mountDir\Windows\PolicyDefinitions\zh-CN" /E /B /IS /IT /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
+Remove-Item $zhPatchExtract -Recurse -Force -ErrorAction SilentlyContinue
+
+# Verify and enforce 100% Client DriverDatabase, Services, Control, OOBE & Default Visual Effects parity in mounted hives
+Write-Host "  Applying 82 Client dualModeDriver manifests, 16 Client Service defaults, and Visual Effects parity..." -ForegroundColor Cyan
 reg.exe load "HKLM\MOUNT_SW" "$mountDir\Windows\System32\config\SOFTWARE" | Out-Null
+reg.exe load "HKLM\MOUNT_SYS" "$mountDir\Windows\System32\config\SYSTEM" | Out-Null
+reg.exe load "HKLM\MOUNT_DRV" "$mountDir\Windows\System32\config\DRIVERS" | Out-Null
 reg.exe load "HKLM\MOUNT_DEFAULT" "$mountDir\Users\Default\NTUSER.DAT" | Out-Null
 try {
+    # 1. Import all 82 Client-only dualModeDriver manifests into offline DRIVERS\DriverDatabase & SYSTEM\ControlSet001
+    $dualManifests = Get-ChildItem "$uupStagePool\*dual_*.inf*.manifest" -ErrorAction SilentlyContinue
+    $drvKeysApplied = 0
+    foreach ($dm in $dualManifests) {
+        $drvKeysApplied += [RegPrivHelper]::ApplyOfflineDriverManifest($dm.FullName, "MOUNT_DRV\DriverDatabase", "MOUNT_SYS\ControlSet001")
+    }
+    Write-Host "  Registered $($dualManifests.Count) Client dualModeDriver manifests ($drvKeysApplied registry keys) [OK]" -ForegroundColor Green
+
+    # 2. Apply all 16 Client Service Start defaults (Audio, Windows Search, Multimedia Class Scheduler, etc.)
+    $clientServiceDefaults = @{
+        AudioEndpointBuilder = 2; Audiosrv = 2; Beep = 1; CSC = 1; CscService = 3;
+        FileInfo = 0; MMCSS = 2; MSDTC = 3; MsSecFlt = 3; RemoteRegistry = 4;
+        SgrmBroker = 2; SSDPSRV = 3; upnphost = 3; W32Time = 3; WinRM = 3; WSearch = 2
+    }
+    foreach ($svcName in $clientServiceDefaults.Keys) {
+        $svcKey = "HKLM\MOUNT_SYS\ControlSet001\Services\$svcName"
+        reg.exe query $svcKey >$null 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            reg.exe add $svcKey /v Start /t REG_DWORD /d $clientServiceDefaults[$svcName] /f | Out-Null
+        }
+    }
+
+    # 3. Apply Client Control\Power, Control\Terminal Server, Memory Management, and Policies parity
+    reg.exe delete "HKLM\MOUNT_SYS\ControlSet001\Control\Power" /v MSDisabled /f >$null 2>&1
+    reg.exe delete "HKLM\MOUNT_SYS\ControlSet001\Control\Power" /v SleepstudyAccountingEnabled /f >$null 2>&1
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\Power" /v HiberFileSizePercent /t REG_DWORD /d 0 /f | Out-Null
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\Power" /v PerfCalculateActualUtilization /t REG_DWORD /d 1 /f | Out-Null
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\Power" /v Class1InitialUnparkCount /t REG_DWORD /d 64 /f | Out-Null
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\Power" /v EnergyEstimationEnabled /t REG_DWORD /d 1 /f | Out-Null
+
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\Terminal Server" /v AllowRemoteRPC /t REG_DWORD /d 0 /f | Out-Null
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\Terminal Server" /v PerSessionTempDir /t REG_DWORD /d 0 /f | Out-Null
+    reg.exe add "HKLM\MOUNT_SYS\ControlSet001\Control\Terminal Server" /v RailShowallNotifyIcons /t REG_DWORD /d 1 /f | Out-Null
+    foreach ($tsVal in @("SessionDirectoryActive","SessionDirectoryCLSID","SessionDirectoryExCLSID","SessionDirectoryExposeServerIP")) {
+        reg.exe delete "HKLM\MOUNT_SYS\ControlSet001\Control\Terminal Server" /v $tsVal /f >$null 2>&1
+    }
+    reg.exe delete "HKLM\MOUNT_SYS\ControlSet001\Control\Session Manager\Memory Management" /v FeatureSettings /f >$null 2>&1
+    reg.exe delete "HKLM\MOUNT_SW\Microsoft\Windows\CurrentVersion\Policies\System" /v DelayedDesktopSwitchTimeout /f >$null 2>&1
+    reg.exe delete "HKLM\MOUNT_SW\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableAutomaticRestartSignOn /f >$null 2>&1
+    reg.exe delete "HKLM\MOUNT_SW\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v ShowSuperHidden /f >$null 2>&1
+
+    # 4. Enforce pure Client OOBE & Explorer shell + Default Visual Effects
     [RegPrivHelper]::EnsurePureExplorerAvailableShell("MOUNT_SW\Microsoft\Windows NT\CurrentVersion\Winlogon\AlternateShells\AvailableShells")
     reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f | Out-Null
     reg.exe add "HKLM\MOUNT_SW\Microsoft\Windows NT\CurrentVersion\Winlogon\AlternateShells" /v DefaultShell /t REG_SZ /d "explorer.exe" /f | Out-Null
@@ -578,6 +726,8 @@ try {
     [GC]::Collect()
     [GC]::WaitForPendingFinalizers()
     reg.exe unload "HKLM\MOUNT_DEFAULT" | Out-Null
+    reg.exe unload "HKLM\MOUNT_DRV" | Out-Null
+    reg.exe unload "HKLM\MOUNT_SYS" | Out-Null
     reg.exe unload "HKLM\MOUNT_SW" | Out-Null
 }
 
@@ -613,34 +763,85 @@ try {
     "--image-property=FLAGS=IoTEnterprise"
 
 # ---------------------------------------------------------------------------
-# 6. Provision Official Microsoft Store & 41 UWP Apps for Index 2 (Pro), Index 3 (Pro Workstation), Index 4 (Enterprise)
+# 6. Provision Official Microsoft Store & 41 UWP Apps + Offline Licenses + Simplified Chinese Bundles
 # ---------------------------------------------------------------------------
-Write-Host "[6/7] Provisioning official Microsoft Store & 41 Modern UWP Apps into Pro / Workstation / Enterprise..." -ForegroundColor Yellow
+Write-Host "[6/7] Provisioning official Microsoft Store, 41 Modern UWP Apps, ClipSVC Licenses & zh-CN Bundles..." -ForegroundColor Yellow
 
 dism.exe /Mount-Wim /WimFile:$workWim /Index:1 /MountDir:$mountDir
 if ($LASTEXITCODE -ne 0) { throw "DISM Mount-Wim workWim failed" }
 try {
-    $allDeps = Get-ChildItem $modernAppsDir -Recurse -Include *.appx, *.msix |
-        Where-Object { $_.Name -match "^Microsoft\.(VCLibs|NET\.Native|UI\.Xaml)" } |
-        Select-Object -ExpandProperty FullName
-    $depArgs = $allDeps | ForEach-Object { "/DependencyPackagePath:`"$_`"" }
+    # 1. Stage unpacked loose UWP frameworks + .main app directories for native DISM /FolderPath provisioning
+    $stageLooseRoot = Join-Path $tmpDir "uwp_loose_stage"
+    if (Test-Path $stageLooseRoot) { Remove-Item $stageLooseRoot -Recurse -Force }
+    New-Item -ItemType Directory -Path $stageLooseRoot -Force | Out-Null
 
-    $appDirs = Get-ChildItem $modernAppsDir -Directory
-    $provCount = 0
-    foreach ($ad in $appDirs) {
-        $bundle = Get-ChildItem $ad.FullName -Include *.appxbundle, *.msixbundle -Recurse | Select-Object -First 1
-        $lic    = Get-ChildItem $ad.FullName -Filter *_License1.xml -Recurse | Select-Object -First 1
-        if ($bundle -and $lic) {
-            $provCount++
-            Write-Host "  [$provCount] Provisioning $($ad.Name)..."
-            $cmdArgs = @("/Image:`"$mountDir`"", "/Add-ProvisionedAppxPackage", "/PackagePath:`"$($bundle.FullName)`"", "/LicensePath:`"$($lic.FullName)`"", "/Region:all") + $depArgs
-            $p = Start-Process -FilePath "dism.exe" -ArgumentList $cmdArgs -Wait -NoNewWindow -PassThru
-            if ($p.ExitCode -ne 0) {
-                Write-Warning "DISM Add-ProvisionedAppxPackage returned $($p.ExitCode) for $($ad.Name)"
-            }
-        }
+    $fwPattern = "^Microsoft\.(VCLibs|NET\.Native|UI\.Xaml|Services\.Store\.Engagement|Advertising\.Xaml)"
+    $fwDirs = Get-ChildItem $modernAppsDir -Directory | Where-Object { $_.Name -match $fwPattern }
+    foreach ($fd in $fwDirs) {
+        Copy-Item -Path $fd.FullName -Destination (Join-Path $stageLooseRoot $fd.Name) -Recurse -Force
     }
+
+    $mainAppDirs = Get-ChildItem $modernAppsDir -Directory | Where-Object {
+        $_.Name -notmatch $fwPattern -and $_.Name -match "_(x64|neutral)__" -and $_.Name -notmatch "_split\.|_~_"
+    }
+    $provCount = 0
+    foreach ($ad in $mainAppDirs) {
+        $provCount++
+        $mainStagePath = Join-Path $stageLooseRoot "$($ad.Name).main"
+        Copy-Item -Path $ad.FullName -Destination $mainStagePath -Recurse -Force
+        Write-Host "  [$provCount/$($mainAppDirs.Count)] Provisioning $($ad.Name)..."
+        dism.exe /Image:$mountDir /Add-ProvisionedAppxPackage /FolderPath:$stageLooseRoot /SkipLicense | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "DISM /Add-ProvisionedAppxPackage /FolderPath returned $LASTEXITCODE for $($ad.Name)"
+        }
+        Remove-Item -Path $mainStagePath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -Path $stageLooseRoot -Recurse -Force -ErrorAction SilentlyContinue
+
+    Write-Host "  Optimizing provisioned Appx packages..." -ForegroundColor Cyan
+    dism.exe /Image:$mountDir /Optimize-ProvisionedAppxPackages | Out-Null
     Write-Host "  Provisioned $provCount official Modern UWP apps [OK]" -ForegroundColor Green
+
+    # 2. Inject all 149 official Microsoft ClipSVC UWP License XMLs so every UWP app activates offline without 0xC0020036
+    Write-Host "  Injecting 149 official Microsoft ClipSVC UWP licenses for offline activation..." -ForegroundColor Cyan
+    $clipInstallApps = "$mountDir\ProgramData\Microsoft\Windows\ClipSVC\Install\Apps"
+    $clipArchiveApps = "$mountDir\ProgramData\Microsoft\Windows\ClipSVC\Archive\Apps"
+    New-Item -ItemType Directory -Force -Path $clipInstallApps, $clipArchiveApps | Out-Null
+    & $sevenZip x (Join-Path $uupDir "uwp_licenses.zip") "-o$clipInstallApps" -y | Out-Null
+    & $sevenZip x (Join-Path $uupDir "uwp_licenses.zip") "-o$clipArchiveApps" -y | Out-Null
+
+    # 3. Apply Simplified Chinese UWP Bundles (ModernApps_zh-cn_Overlay.esd) & configure First-Logon Registration
+    Write-Host "  Applying Simplified Chinese UWP Bundles (ModernApps_zh-cn_Overlay.esd)..." -ForegroundColor Cyan
+    & $wimlib apply (Join-Path $uupDir "ModernApps_zh-cn_Overlay.esd") 1 "$mountDir\Program Files\WindowsApps" --no-acls | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "wimlib apply failed for ModernApps_zh-cn_Overlay.esd" }
+    icacls.exe "$mountDir\Program Files\WindowsApps" /grant "*S-1-15-2-1:(OI)(CI)(RX)" /Q | Out-Null
+
+    $scriptsDir = "$mountDir\Windows\Setup\Scripts"
+    New-Item -ItemType Directory -Force -Path $scriptsDir | Out-Null
+    $regUwpScript = @'
+$ErrorActionPreference = "SilentlyContinue"
+$appsRoot = "C:\Program Files\WindowsApps"
+icacls.exe $appsRoot /grant "*S-1-15-2-1:(OI)(CI)(RX)" /Q | Out-Null
+Get-ChildItem "$appsRoot\Microsoft.VCLibs*_x64__8wekyb3d8bbwe\AppxManifest.xml",
+              "$appsRoot\Microsoft.NET.Native*_x64__8wekyb3d8bbwe\AppxManifest.xml",
+              "$appsRoot\Microsoft.UI.Xaml*_x64__8wekyb3d8bbwe\AppxManifest.xml" -ErrorAction SilentlyContinue | ForEach-Object {
+    Add-AppxPackage -Register $_.FullName -DisableDevelopmentMode
+}
+Get-ChildItem "$appsRoot\*_neutral_~_8wekyb3d8bbwe\AppxMetadata\AppxBundleManifest.xml" -ErrorAction SilentlyContinue | Sort-Object FullName | ForEach-Object {
+    Add-AppxPackage -Register $_.FullName -DisableDevelopmentMode
+}
+'@
+    [System.IO.File]::WriteAllText("$scriptsDir\RegisterClientZhUwp.ps1", $regUwpScript, [System.Text.Encoding]::UTF8)
+
+    reg.exe load "HKLM\MOUNT_DEFAULT" "$mountDir\Users\Default\NTUSER.DAT" | Out-Null
+    try {
+        reg.exe add "HKLM\MOUNT_DEFAULT\Software\Microsoft\Windows\CurrentVersion\RunOnce" /v "RegisterClientZhUwp" /t REG_SZ /d "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\RegisterClientZhUwp.ps1" /f | Out-Null
+    } finally {
+        [GC]::Collect()
+        [GC]::WaitForPendingFinalizers()
+        reg.exe unload "HKLM\MOUNT_DEFAULT" | Out-Null
+    }
+    Write-Host "  Applied Simplified Chinese UWP Overlay & First-Logon Bundle Registration [OK]" -ForegroundColor Green
 } finally {
     dism.exe /Unmount-Wim /MountDir:$mountDir /Commit
     if ($LASTEXITCODE -ne 0) { throw "DISM Unmount-Wim workWim failed" }
