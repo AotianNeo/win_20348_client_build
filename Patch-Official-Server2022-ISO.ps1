@@ -285,8 +285,7 @@ Copy-Item "$mountDir\Windows\servicing\Packages\*.cat" $uupStagePool -Force
 $manifestsDir = Join-Path $PSScriptRoot "OfficialEditionManifests"
 $proMum1 = Join-Path $manifestsDir "Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~10.0.20348.1.mum"
 $mpMum1  = Join-Path $manifestsDir "Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum"
-Copy-Item $proMum1 $uupStagePool -Force
-Copy-Item $mpMum1  $uupStagePool -Force
+Copy-Item "$manifestsDir\*.mum" $uupStagePool -Force
 
 # Build lookup of latest installed/staged neutral package versions in $uupStagePool
 $latestPkgMap = @{}
