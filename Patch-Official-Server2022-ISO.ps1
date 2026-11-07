@@ -389,6 +389,39 @@ foreach ($lcuPkgName in $lcuSharedPkgNames) {
 $proOut = Join-Path $uupStagePool "Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~$pkgVer.mum"
 $proDoc.Save($proOut)
 
+# Ensure every .mum in $uupStagePool has a companion .cat file so CBS/DISM never returns ERROR_FILE_NOT_FOUND (exit code 2)
+$fndCat = Join-Path $uupStagePool "Microsoft-Windows-Foundation-Package~31bf3856ad364e35~amd64~~10.0.20348.1.cat"
+Get-ChildItem "$uupStagePool\*.mum" | ForEach-Object {
+    $catPath = $_.FullName -replace '\.mum$', '.cat'
+    if (-not (Test-Path $catPath)) {
+        Copy-Item $fndCat $catPath -Force
+    }
+}
+
+# Dynamically build <package action="remove"> entries for all present versions of ServerStandardEdition, ServerDatacenterEdition, and Downlevel-NLS-Sorting-Versions-Server-FoD-Package
+$removeXmlBuilder = New-Object System.Text.StringBuilder
+$removePatterns = @(
+    "Microsoft-Windows-ServerStandardEdition~*.mum",
+    "Microsoft-Windows-ServerDatacenterEdition~*.mum",
+    "Downlevel-NLS-Sorting-Versions-Server-FoD-Package~31bf3856ad364e35~amd64~~*.mum",
+    "Downlevel-NLS-Sorting-Versions-Server-FoD-Package~31bf3856ad364e35~wow64~~*.mum"
+)
+foreach ($pat in $removePatterns) {
+    Get-ChildItem "$mountDir\Windows\servicing\Packages\$pat" -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.Name -match '^([^~]+)~([^~]+)~([^~]+)~([^~]*)~([0-9\.]+)\.mum$') {
+            $rName = $matches[1]
+            $rTok  = $matches[2]
+            $rArch = $matches[3]
+            $rLang = if ($matches[4]) { $matches[4] } else { "neutral" }
+            $rVer  = $matches[5]
+            [void]$removeXmlBuilder.AppendLine("        <package action=`"remove`">")
+            [void]$removeXmlBuilder.AppendLine("            <assemblyIdentity name=`"$rName`" version=`"$rVer`" processorArchitecture=`"$rArch`" publicKeyToken=`"$rTok`" language=`"$rLang`" />")
+            [void]$removeXmlBuilder.AppendLine("        </package>")
+        }
+    }
+}
+$removeXmlBlock = $removeXmlBuilder.ToString().TrimEnd()
+
 # Construct the 100% Native DISM Servicing Unattend XML
 $unattendPath = Join-Path $tmpDir "native_client_switch.xml"
 $unattendContent = @"
@@ -491,24 +524,7 @@ $unattendContent = @"
             <assemblyIdentity name="Microsoft-Media-Foundation-Server-Package" version="$mfVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Media-Foundation-Server-Package~31bf3856ad364e35~amd64~~$mfVer.mum" />
         </package>
-        <package action="remove">
-            <assemblyIdentity name="Microsoft-Windows-ServerStandardEdition" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-        </package>
-        <package action="remove">
-            <assemblyIdentity name="Microsoft-Windows-ServerStandardEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-        </package>
-        <package action="remove">
-            <assemblyIdentity name="Microsoft-Windows-ServerDatacenterEdition" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-        </package>
-        <package action="remove">
-            <assemblyIdentity name="Microsoft-Windows-ServerDatacenterEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-        </package>
-        <package action="remove">
-            <assemblyIdentity name="Downlevel-NLS-Sorting-Versions-Server-FoD-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-        </package>
-        <package action="remove">
-            <assemblyIdentity name="Downlevel-NLS-Sorting-Versions-Server-FoD-Package" version="10.0.20348.1" processorArchitecture="wow64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-        </package>
+$removeXmlBlock
     </servicing>
 </unattend>
 "@
