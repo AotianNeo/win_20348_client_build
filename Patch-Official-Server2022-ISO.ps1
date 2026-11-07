@@ -398,13 +398,10 @@ Get-ChildItem "$uupStagePool\*.mum" | ForEach-Object {
     }
 }
 
-# Dynamically build <package action="remove"> entries for all present versions of ServerStandardEdition, ServerDatacenterEdition, and Downlevel-NLS-Sorting-Versions-Server-FoD-Package
+# Dynamically build <package action="remove"> entries for all present versions of ServerStandardEdition
 $removeXmlBuilder = New-Object System.Text.StringBuilder
 $removePatterns = @(
-    "Microsoft-Windows-ServerStandardEdition~*.mum",
-    "Microsoft-Windows-ServerDatacenterEdition~*.mum",
-    "Downlevel-NLS-Sorting-Versions-Server-FoD-Package~31bf3856ad364e35~amd64~~*.mum",
-    "Downlevel-NLS-Sorting-Versions-Server-FoD-Package~31bf3856ad364e35~wow64~~*.mum"
+    "Microsoft-Windows-ServerStandardEdition~*.mum"
 )
 foreach ($pat in $removePatterns) {
     Get-ChildItem "$mountDir\Windows\servicing\Packages\$pat" -ErrorAction SilentlyContinue | ForEach-Object {
@@ -496,33 +493,40 @@ $unattendContent = @"
             <assemblyIdentity name="Microsoft-Windows-Server-LanguagePack-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
             <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.20348.1.mum" />
         </package>
-        <package action="install">
+        <package action="stage">
             <assemblyIdentity name="Microsoft-Windows-Media-Features-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Windows-Media-Features-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
         </package>
-        <package action="install">
+        <package action="stage">
             <assemblyIdentity name="Microsoft-Windows-MediaFeaturePack-OOB-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Windows-MediaFeaturePack-OOB-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
         </package>
-        <package action="install">
+        <package action="stage">
             <assemblyIdentity name="Microsoft-Windows-Media-Placeholder-Package" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~$pkgVer.mum" />
         </package>
-        <package action="install">
+        <package action="stage">
+            <assemblyIdentity name="WinPE-OpcServices-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+            <source location="$uupStagePool\WinPE-OpcServices-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
+        </package>
+        <package action="stage">
             <assemblyIdentity name="Microsoft-Windows-ProfessionalEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Windows-ProfessionalEdition~31bf3856ad364e35~amd64~~$pkgVer.mum" />
         </package>
         <package action="install">
-            <assemblyIdentity name="Microsoft-Windows-Server-LanguagePack-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
-            <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.20348.1.mum" />
+            <assemblyIdentity name="Microsoft-Windows-Media-Features-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
         </package>
         <package action="install">
-            <assemblyIdentity name="Microsoft-Windows-Server-LanguagePack-Package" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
-            <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~$pkgVer.mum" />
+            <assemblyIdentity name="Microsoft-Windows-MediaFeaturePack-OOB-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
         </package>
         <package action="install">
-            <assemblyIdentity name="Microsoft-Media-Foundation-Server-Package" version="$mfVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-            <source location="$uupStagePool\Microsoft-Media-Foundation-Server-Package~31bf3856ad364e35~amd64~~$mfVer.mum" />
+            <assemblyIdentity name="Microsoft-Windows-Media-Placeholder-Package" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="WinPE-OpcServices-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-ProfessionalEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
         </package>
 $removeXmlBlock
     </servicing>
