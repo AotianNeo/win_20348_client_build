@@ -82,7 +82,12 @@ if (-not $oscdimg) {
 }
 
 # Add Backup/Restore Registry privilege & Offline DualModeDriver Manifest Importer
-Add-Type -ReferencedAssemblies System.Xml -TypeDefinition @'
+$xmlAssemblies = if ($PSVersionTable.PSEdition -eq "Core") {
+    @("System.Xml.ReaderWriter", "System.Xml.XmlDocument", "Microsoft.Win32.Registry")
+} else {
+    @("System.Xml")
+}
+Add-Type -ReferencedAssemblies $xmlAssemblies -TypeDefinition @'
 using System;
 using System.IO;
 using System.Xml;
