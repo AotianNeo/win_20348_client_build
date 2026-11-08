@@ -24,6 +24,16 @@ jobs:
         run: |
           .\Patch-Official-Server2022-ISO.ps1 -WorkDir "D:\work_20348" -OutputDir "D:\output_20348"
 
+      - name: Upload DISM and CBS Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dism-cbs-logs
+          path: |
+            C:\Windows\Logs\DISM\dism.log
+            C:\Windows\Logs\CBS\cbs.log
+          retention-days: 7
+
       - name: Upload Full Single-File ISO Artifact
         uses: actions/upload-artifact@v4
         with:

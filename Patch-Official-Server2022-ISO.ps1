@@ -282,7 +282,6 @@ $uupPackages = @(
     @{ Name = "Microsoft-Windows-RegulatedPackages-WOW64-Package.ESD";                         Sha256 = "6db86cab62086c4ca5b9c4fc75817f04938d7e9e5c96bf6f172ec389ff928aa9"; Stage = $true },
     @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-Package.ESD";               Sha256 = "b6c3eadcedc310cf56573ab3e16eaa87aead3ba13a972d230a007d2618a8daee"; Stage = $true },
     @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package.ESD";         Sha256 = "ad0d4c8ab12478215fd5f804199cafba2909f64b8caea325c47f5d11d66d0298"; Stage = $true },
-    @{ Name = "Microsoft-Windows-Server-LanguagePack-Package_zh-cn-amd64-zh-cn.esd";           Sha256 = "0814fcd282a25766db2bd95f887172e418ac13d2a565bf5473569801a130c357"; Stage = $true },
     @{ Name = "Microsoft-Windows-Client-LanguagePack-Package_zh-cn-amd64-zh-cn.esd";           Sha256 = "92bde403d9803c80caf5d1486ad69d6847c6d703226063126045bc3cbffdf84c"; Stage = $true },
     @{ Name = "LanguageExperiencePack.zh-cn.Neutral.appx";                                    Sha256 = "bf012903a67313ab9aba336f7a0b047d34a37976dd3d8324f4a87cd8a7148b79"; Stage = $false },
     @{ Name = "Microsoft-Windows-LanguageFeatures-Basic-zh-cn-Package-amd64.cab";              Sha256 = "86fb9316e85a8c651ab25cf22474f0a0bd4fcd8a624a31850c9d4105f91f8536"; Stage = $false },
@@ -332,12 +331,6 @@ foreach ($pkg in $uupPackages) {
     }
 }
 Write-Host "  Verified & extracted all official Client CBS ESD packages into $uupStagePool [OK]" -ForegroundColor Green
-
-# Ensure Client LanguagePack update.mum is identifiable by DISM
-$clpUpdateMum = Join-Path $uupStagePool "update.mum"
-if (Test-Path $clpUpdateMum) {
-    Copy-Item $clpUpdateMum (Join-Path $uupStagePool "Microsoft-Windows-Client-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.19041.1.mum") -Force
-}
 
 # Extract Official ModernApps ESDs for Windows 10 Pro / Enterprise UWP Provisioning
 & $wimlib apply (Join-Path $uupDir "Microsoft.ModernApps.Client.All.esd") 1 $modernAppsDir --no-acls | Out-Null
@@ -404,9 +397,9 @@ $proMum1 = Join-Path $manifestsDir "Microsoft-Windows-ProfessionalEdition~31bf38
 $mpMum1  = Join-Path $manifestsDir "Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum"
 Copy-Item "$manifestsDir\*.mum" $uupStagePool -Force
 
-# Build lookup of latest installed/staged neutral package versions in $uupStagePool
+# Build lookup of latest installed/staged neutral package versions across mounted image and stage pool
 $latestPkgMap = @{}
-Get-ChildItem "$uupStagePool\*.mum" | ForEach-Object {
+Get-ChildItem "$mountDir\Windows\servicing\Packages\*.mum", "$uupStagePool\*.mum" | ForEach-Object {
     if ($_.Name -match '^([^~]+)~31bf3856ad364e35~amd64~~([0-9\.]+)\.mum$') {
         $key = $matches[1].ToLowerInvariant()
         $ver = [version]$matches[2]
@@ -416,11 +409,11 @@ Get-ChildItem "$uupStagePool\*.mum" | ForEach-Object {
     }
 }
 
-# Align Media-Placeholder-Package to $pkgVer
-$mpXml = [System.IO.File]::ReadAllText($mpMum1)
-$mpXml = $mpXml.Replace('version="10.0.20348.1"', "version=`"$pkgVer`"")
+# Align Media-Placeholder-Package to $pkgVer (modify ONLY root package assemblyIdentity, leaving Foundation-Package intact at 10.0.20348.1)
+[xml]$mpDoc = [System.IO.File]::ReadAllText($mpMum1)
+$mpDoc.assembly.assemblyIdentity.version = $pkgVer
 $mpOut = Join-Path $uupStagePool "Microsoft-Windows-Media-Placeholder-Package~31bf3856ad364e35~amd64~~$pkgVer.mum"
-[System.IO.File]::WriteAllText($mpOut, $mpXml, [System.Text.Encoding]::UTF8)
+$mpDoc.Save($mpOut)
 
 # Construct version-aligned ProfessionalEdition~$pkgVer.mum with the 15 base .1 Client packages + LCU-updated shared/foundation packages
 $lcuSharedPkgNames = @(
@@ -607,10 +600,6 @@ $unattendContent = @"
             <source location="$uupStagePool\Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
         </package>
         <package action="stage">
-            <assemblyIdentity name="Microsoft-Windows-Server-LanguagePack-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
-            <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.20348.1.mum" />
-        </package>
-        <package action="stage">
             <assemblyIdentity name="Microsoft-Windows-Media-Features-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Windows-Media-Features-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
         </package>
@@ -651,6 +640,15 @@ $removeXmlBlock
 "@
 [System.IO.File]::WriteAllText($unattendPath, $unattendContent, [System.Text.Encoding]::UTF8)
 
+# Pre-flight check: verify all stage source MUM files exist on disk before running Apply-Unattend
+foreach ($m in [System.Text.RegularExpressions.Regex]::Matches($unattendContent, '<source location="([^"]+)"\s*/>')) {
+    $p = $m.Groups[1].Value
+    if (-not (Test-Path $p)) {
+        throw "Pre-flight unattend check failed: source MUM file does not exist: $p"
+    }
+}
+Write-Host "  Pre-flight check passed: all staged source packages exist on disk [OK]" -ForegroundColor Green
+
 # Pre-set ProductType=WinNT in offline SYSTEM hive before /Apply-Unattend so DrvInst evaluates dualModeDriver packages as Client
 reg.exe load "HKLM\MOUNT_SYS" "$mountDir\Windows\System32\config\SYSTEM" | Out-Null
 try {
@@ -663,7 +661,18 @@ try {
 
 Write-Host "  Executing DISM /Apply-Unattend (Native CBS Stage + Edition Switch + LCU Preservation + Server SKU/FoD Removal)..." -ForegroundColor Cyan
 dism.exe /Image:$mountDir /Apply-Unattend:$unattendPath
-if ($LASTEXITCODE -ne 0) { throw "DISM /Apply-Unattend failed with exit code $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "================ DISM / CBS LOG DUMP ================" -ForegroundColor Red
+    if (Test-Path "C:\Windows\Logs\DISM\dism.log") {
+        Write-Host "--- C:\Windows\Logs\DISM\dism.log (last 200 lines) ---" -ForegroundColor Yellow
+        Get-Content "C:\Windows\Logs\DISM\dism.log" -Tail 200
+    }
+    if (Test-Path "C:\Windows\Logs\CBS\cbs.log") {
+        Write-Host "--- C:\Windows\Logs\CBS\cbs.log (last 200 lines) ---" -ForegroundColor Yellow
+        Get-Content "C:\Windows\Logs\CBS\cbs.log" -Tail 200
+    }
+    throw "DISM /Apply-Unattend failed with exit code $LASTEXITCODE"
+}
 
 # Remove any remaining standalone top-level Server optional packages if present in the image
 $extraRemovePkgs = Get-ChildItem "$mountDir\Windows\servicing\Packages\*.mum" |
