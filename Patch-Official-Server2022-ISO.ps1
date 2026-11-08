@@ -301,8 +301,26 @@ foreach ($pkg in $uupPackages) {
     $destFile = Join-Path $uupDir $pkg.Name
     if (-not (Test-Path $destFile)) {
         Write-Host "  Downloading $($pkg.Name)..."
-        & $aria2c -x16 -s16 -k1M --file-allocation=none --console-log-level=warn -d $uupDir -o $pkg.Name "$releaseBaseUrl/$($pkg.Name)"
-        if ($LASTEXITCODE -ne 0) { throw "Failed to download $($pkg.Name)" }
+        $downloaded = $false
+        for ($retry = 1; $retry -le 3; $retry++) {
+            & $aria2c -x4 -s4 -m5 --retry-wait=3 -k1M --file-allocation=none --console-log-level=warn -d $uupDir -o $pkg.Name "$releaseBaseUrl/$($pkg.Name)"
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $destFile)) {
+                $downloaded = $true
+                break
+            }
+            Write-Warning "aria2c failed to download $($pkg.Name) (attempt $retry/3). Retrying with Invoke-WebRequest..."
+            Start-Sleep -Seconds 2
+            try {
+                Invoke-WebRequest -Uri "$releaseBaseUrl/$($pkg.Name)" -OutFile $destFile -UseBasicParsing
+                if (Test-Path $destFile) {
+                    $downloaded = $true
+                    break
+                }
+            } catch {
+                Write-Warning "Invoke-WebRequest failed: $_"
+            }
+        }
+        if (-not $downloaded) { throw "Failed to download $($pkg.Name)" }
     }
     $h = (Get-FileHash -Path $destFile -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($h -ne $pkg.Sha256) {
