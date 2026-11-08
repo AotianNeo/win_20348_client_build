@@ -611,10 +611,6 @@ $unattendContent = @"
             <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.20348.1.mum" />
         </package>
         <package action="stage">
-            <assemblyIdentity name="Microsoft-Windows-Client-LanguagePack-Package" version="10.0.19041.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
-            <source location="$uupStagePool\Microsoft-Windows-Client-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.19041.1.mum" />
-        </package>
-        <package action="stage">
             <assemblyIdentity name="Microsoft-Windows-Media-Features-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Windows-Media-Features-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
         </package>
@@ -648,9 +644,6 @@ $unattendContent = @"
         </package>
         <package action="install">
             <assemblyIdentity name="Microsoft-Windows-ProfessionalEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
-        </package>
-        <package action="install">
-            <assemblyIdentity name="Microsoft-Windows-Client-LanguagePack-Package" version="10.0.19041.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
         </package>
 $removeXmlBlock
     </servicing>
@@ -770,6 +763,17 @@ try {
     reg.exe unload "HKLM\MOUNT_DRV" | Out-Null
     reg.exe unload "HKLM\MOUNT_SYS" | Out-Null
     reg.exe unload "HKLM\MOUNT_SW" | Out-Null
+}
+
+# Populate all Client Group Policy ADML definitions into PolicyDefinitions\zh-CN (e.g. AppHVSI.adml)
+Write-Host "  Populating Client Group Policy ADML definitions into PolicyDefinitions\zh-CN..." -ForegroundColor Cyan
+$zhPolicyDir = "$mountDir\Windows\PolicyDefinitions\zh-CN"
+New-Item -ItemType Directory -Force -Path $zhPolicyDir | Out-Null
+Get-ChildItem -Path $uupStagePool -Filter "*.adml" -Recurse | ForEach-Object {
+    $destAdml = Join-Path $zhPolicyDir $_.Name
+    if (-not (Test-Path $destAdml)) {
+        Copy-Item -Path $_.FullName -Destination $destAdml -Force
+    }
 }
 
 # Commit the serviced base Professional image before branching clean LTSC-style vs Full UWP editions
