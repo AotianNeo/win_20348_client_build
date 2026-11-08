@@ -91,6 +91,9 @@ using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
 public class RegPrivHelper {
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GetCurrentProcess();
+
     [DllImport("advapi32.dll", SetLastError=true)]
     public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
     [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
@@ -120,7 +123,7 @@ public class RegPrivHelper {
 
     public static void EnablePriv(string name) {
         IntPtr hToken;
-        if (OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x28, out hToken)) {
+        if (OpenProcessToken(GetCurrentProcess(), 0x28, out hToken)) {
             long luid;
             LookupPrivilegeValue(null, name, out luid);
             TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES { PrivilegeCount = 1, Luid = luid, Attributes = 2 };
@@ -275,6 +278,8 @@ $uupPackages = @(
     @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-Package.ESD";               Sha256 = "b6c3eadcedc310cf56573ab3e16eaa87aead3ba13a972d230a007d2618a8daee"; Stage = $true },
     @{ Name = "Microsoft-Windows-Required-ShellExperiences-Desktop-WOW64-Package.ESD";         Sha256 = "ad0d4c8ab12478215fd5f804199cafba2909f64b8caea325c47f5d11d66d0298"; Stage = $true },
     @{ Name = "Microsoft-Windows-Server-LanguagePack-Package_zh-cn-amd64-zh-cn.esd";           Sha256 = "0814fcd282a25766db2bd95f887172e418ac13d2a565bf5473569801a130c357"; Stage = $true },
+    @{ Name = "Microsoft-Windows-Client-LanguagePack-Package_zh-cn-amd64-zh-cn.esd";           Sha256 = "92bde403d9803c80caf5d1486ad69d6847c6d703226063126045bc3cbffdf84c"; Stage = $true },
+    @{ Name = "LanguageExperiencePack.zh-cn.Neutral.appx";                                    Sha256 = "bf012903a67313ab9aba336f7a0b047d34a37976dd3d8324f4a87cd8a7148b79"; Stage = $false },
     @{ Name = "Microsoft-Windows-LanguageFeatures-Basic-zh-cn-Package-amd64.cab";              Sha256 = "86fb9316e85a8c651ab25cf22474f0a0bd4fcd8a624a31850c9d4105f91f8536"; Stage = $false },
     @{ Name = "Microsoft-Windows-LanguageFeatures-Handwriting-zh-cn-Package-amd64.cab";        Sha256 = "5a84f7330c9d58b9af9166b7d954241aae7f208e1f291be6ef0a3bc6b3b4a131"; Stage = $false },
     @{ Name = "Microsoft-Windows-LanguageFeatures-OCR-zh-cn-Package-amd64.cab";                Sha256 = "aad4f02e2be0cd19718e3bfebc7f09e1956c7b42c5fb1f9d52f2bcd0c05074cf"; Stage = $false },
@@ -303,7 +308,13 @@ foreach ($pkg in $uupPackages) {
         if ($LASTEXITCODE -ne 0) { throw "wimlib apply failed for $($pkg.Name)" }
     }
 }
-Write-Host "  Verified & extracted all 17 official Client CBS ESD packages into $uupStagePool [OK]" -ForegroundColor Green
+Write-Host "  Verified & extracted all official Client CBS ESD packages into $uupStagePool [OK]" -ForegroundColor Green
+
+# Ensure Client LanguagePack update.mum is identifiable by DISM
+$clpUpdateMum = Join-Path $uupStagePool "update.mum"
+if (Test-Path $clpUpdateMum) {
+    Copy-Item $clpUpdateMum (Join-Path $uupStagePool "Microsoft-Windows-Client-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.19041.1.mum") -Force
+}
 
 # Extract Official ModernApps ESDs for Windows 10 Pro / Enterprise UWP Provisioning
 & $wimlib apply (Join-Path $uupDir "Microsoft.ModernApps.Client.All.esd") 1 $modernAppsDir --no-acls | Out-Null
@@ -577,6 +588,10 @@ $unattendContent = @"
             <source location="$uupStagePool\Microsoft-Windows-Server-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.20348.1.mum" />
         </package>
         <package action="stage">
+            <assemblyIdentity name="Microsoft-Windows-Client-LanguagePack-Package" version="10.0.19041.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
+            <source location="$uupStagePool\Microsoft-Windows-Client-LanguagePack-Package~31bf3856ad364e35~amd64~zh-CN~10.0.19041.1.mum" />
+        </package>
+        <package action="stage">
             <assemblyIdentity name="Microsoft-Windows-Media-Features-Package" version="10.0.20348.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
             <source location="$uupStagePool\Microsoft-Windows-Media-Features-Package~31bf3856ad364e35~amd64~~10.0.20348.1.mum" />
         </package>
@@ -610,6 +625,9 @@ $unattendContent = @"
         </package>
         <package action="install">
             <assemblyIdentity name="Microsoft-Windows-ProfessionalEdition" version="$pkgVer" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" />
+        </package>
+        <package action="install">
+            <assemblyIdentity name="Microsoft-Windows-Client-LanguagePack-Package" version="10.0.19041.1" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="zh-CN" />
         </package>
 $removeXmlBlock
     </servicing>
@@ -770,29 +788,104 @@ Write-Host "[6/7] Provisioning official Microsoft Store, 41 Modern UWP Apps, Cli
 dism.exe /Mount-Wim /WimFile:$workWim /Index:1 /MountDir:$mountDir
 if ($LASTEXITCODE -ne 0) { throw "DISM Mount-Wim workWim failed" }
 try {
-    # 1. Stage unpacked loose UWP frameworks + .main app directories for native DISM /FolderPath provisioning
+    # 1. Provision Simplified Chinese Language Experience Pack (LXP) natively
+    Write-Host "  Provisioning Simplified Chinese Language Experience Pack (LXP)..." -ForegroundColor Cyan
+    $lxpAppx = Join-Path $uupDir "LanguageExperiencePack.zh-cn.Neutral.appx"
+    $lxpStage = Join-Path $tmpDir "lxp_stage"
+    New-Item -ItemType Directory -Force -Path $lxpStage | Out-Null
+    & $sevenZip e $lxpAppx "-o$lxpStage" "License.xml" -y | Out-Null
+    dism.exe /Image:$mountDir /Add-ProvisionedAppxPackage /PackagePath:$lxpAppx /LicensePath:"$lxpStage\License.xml" /Region:all | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "DISM /Add-ProvisionedAppxPackage for LXP returned $LASTEXITCODE"
+    }
+
+    # 2. Extract ModernApps_zh-cn_Overlay.esd to stage localized bundles
+    $overlayAppsDir = Join-Path $WorkDir "modern_apps_zhcn"
+    if (Test-Path $overlayAppsDir) { Remove-Item $overlayAppsDir -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $overlayAppsDir | Out-Null
+    & $wimlib apply (Join-Path $uupDir "ModernApps_zh-cn_Overlay.esd") 1 $overlayAppsDir --no-acls | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "wimlib apply failed for ModernApps_zh-cn_Overlay.esd" }
+
+    # Setup loose staging root for native DISM /FolderPath provisioning
     $stageLooseRoot = Join-Path $tmpDir "uwp_loose_stage"
     if (Test-Path $stageLooseRoot) { Remove-Item $stageLooseRoot -Recurse -Force }
     New-Item -ItemType Directory -Path $stageLooseRoot -Force | Out-Null
 
+    # Stage all frameworks (both from overlay and from official modernAppsDir) into $stageLooseRoot (no suffix)
     $fwPattern = "^Microsoft\.(VCLibs|NET\.Native|UI\.Xaml|Services\.Store\.Engagement|Advertising\.Xaml)"
-    $fwDirs = Get-ChildItem $modernAppsDir -Directory | Where-Object { $_.Name -match $fwPattern }
-    foreach ($fd in $fwDirs) {
-        Copy-Item -Path $fd.FullName -Destination (Join-Path $stageLooseRoot $fd.Name) -Recurse -Force
+    $allFwDirs = @()
+    $allFwDirs += Get-ChildItem $modernAppsDir -Directory | Where-Object { $_.Name -match $fwPattern }
+    $allFwDirs += Get-ChildItem $overlayAppsDir -Directory | Where-Object { $_.Name -match $fwPattern }
+    foreach ($fd in $allFwDirs) {
+        $destFw = Join-Path $stageLooseRoot $fd.Name
+        if (-not (Test-Path $destFw)) {
+            Copy-Item -Path $fd.FullName -Destination $destFw -Recurse -Force
+        }
     }
 
-    $mainAppDirs = Get-ChildItem $modernAppsDir -Directory | Where-Object {
-        $_.Name -notmatch $fwPattern -and $_.Name -match "_(x64|neutral)__" -and $_.Name -notmatch "_split\.|_~_"
-    }
-    $provCount = 0
-    foreach ($ad in $mainAppDirs) {
-        $provCount++
-        $mainStagePath = Join-Path $stageLooseRoot "$($ad.Name).main"
-        Copy-Item -Path $ad.FullName -Destination $mainStagePath -Recurse -Force
-        Write-Host "  [$provCount/$($mainAppDirs.Count)] Provisioning $($ad.Name)..."
+    # 3. Provision Chinese-localized UWP Bundles from $overlayAppsDir using native .mainbundle + .application + .resource
+    $overlayBundleDirs = Get-ChildItem $overlayAppsDir -Directory | Where-Object { $_.Name -match "_neutral_~_" }
+    $handledPrefixes = @()
+    $overlayCount = 0
+    foreach ($bd in $overlayBundleDirs) {
+        $overlayCount++
+        $prefix = ($bd.Name -split '_')[0]
+        $handledPrefixes += $prefix
+        Write-Host "  [$overlayCount/$($overlayBundleDirs.Count)] Provisioning localized bundle $prefix..."
+
+        # Stage bundle folder (.mainbundle)
+        $bundleStagePath = Join-Path $stageLooseRoot "$($bd.Name).mainbundle"
+        Copy-Item -Path $bd.FullName -Destination $bundleStagePath -Recurse -Force
+
+        # Stage corresponding app folder (.application) and resource folders (.resource)
+        $appDirs = Get-ChildItem $overlayAppsDir -Directory | Where-Object {
+            $_.Name -like "$prefix*" -and $_.Name -match "_(x64|neutral)__" -and $_.Name -notmatch "_split\.|_~_"
+        }
+        $resDirs = Get-ChildItem $overlayAppsDir -Directory | Where-Object {
+            $_.Name -like "$prefix*" -and $_.Name -match "_split\."
+        }
+
+        $appStagePaths = @()
+        foreach ($ad in $appDirs) {
+            $asp = Join-Path $stageLooseRoot "$($ad.Name).application"
+            Copy-Item -Path $ad.FullName -Destination $asp -Recurse -Force
+            $appStagePaths += $asp
+        }
+        $resStagePaths = @()
+        foreach ($rd in $resDirs) {
+            $rsp = Join-Path $stageLooseRoot "$($rd.Name).resource"
+            Copy-Item -Path $rd.FullName -Destination $rsp -Recurse -Force
+            $resStagePaths += $rsp
+        }
+
         dism.exe /Image:$mountDir /Add-ProvisionedAppxPackage /FolderPath:$stageLooseRoot /SkipLicense | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "DISM /Add-ProvisionedAppxPackage /FolderPath returned $LASTEXITCODE for $($ad.Name)"
+            Write-Warning "DISM /Add-ProvisionedAppxPackage returned $LASTEXITCODE for $prefix bundle"
+        }
+
+        # Clean up this app's staged files before the next app
+        Remove-Item -Path $bundleStagePath -Recurse -Force -ErrorAction SilentlyContinue
+        foreach ($p in $appStagePaths) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue }
+        foreach ($p in $resStagePaths) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+
+    # 4. Provision remaining official apps from $modernAppsDir that were not in overlay
+    $remAppDirs = Get-ChildItem $modernAppsDir -Directory | Where-Object {
+        $_.Name -notmatch $fwPattern -and $_.Name -match "_(x64|neutral)__" -and $_.Name -notmatch "_split\.|_~_"
+    } | Where-Object {
+        $prefix = ($_.Name -split '_')[0]
+        $handledPrefixes -notcontains $prefix
+    }
+
+    $remCount = 0
+    foreach ($ad in $remAppDirs) {
+        $remCount++
+        $mainStagePath = Join-Path $stageLooseRoot "$($ad.Name).main"
+        Copy-Item -Path $ad.FullName -Destination $mainStagePath -Recurse -Force
+        Write-Host "  [$remCount/$($remAppDirs.Count)] Provisioning remaining app $($ad.Name)..."
+        dism.exe /Image:$mountDir /Add-ProvisionedAppxPackage /FolderPath:$stageLooseRoot /SkipLicense | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "DISM /Add-ProvisionedAppxPackage returned $LASTEXITCODE for $($ad.Name)"
         }
         Remove-Item -Path $mainStagePath -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -800,9 +893,16 @@ try {
 
     Write-Host "  Optimizing provisioned Appx packages..." -ForegroundColor Cyan
     dism.exe /Image:$mountDir /Optimize-ProvisionedAppxPackages | Out-Null
-    Write-Host "  Provisioned $provCount official Modern UWP apps [OK]" -ForegroundColor Green
 
-    # 2. Inject all 149 official Microsoft ClipSVC UWP License XMLs so every UWP app activates offline without 0xC0020036
+    # Mirror ProgramData\Microsoft\Windows\AppxProvisioning.xml to replacementmanifests as UUPDump / UUPMediaConverter does
+    $appxProvXml = "$mountDir\ProgramData\Microsoft\Windows\AppxProvisioning.xml"
+    $replDest = "$mountDir\sources\replacementmanifests\microsoft-windows-appx-deployment-server\appxprovisioning.xml"
+    if (Test-Path $appxProvXml) {
+        New-Item -ItemType Directory -Force -Path (Split-Path $replDest) | Out-Null
+        Copy-Item $appxProvXml $replDest -Force
+    }
+
+    # 5. Inject all 149 official Microsoft ClipSVC UWP License XMLs so every UWP app activates offline without 0xC0020036
     Write-Host "  Injecting 149 official Microsoft ClipSVC UWP licenses for offline activation..." -ForegroundColor Cyan
     $clipInstallApps = "$mountDir\ProgramData\Microsoft\Windows\ClipSVC\Install\Apps"
     $clipArchiveApps = "$mountDir\ProgramData\Microsoft\Windows\ClipSVC\Archive\Apps"
@@ -810,38 +910,7 @@ try {
     & $sevenZip x (Join-Path $uupDir "uwp_licenses.zip") "-o$clipInstallApps" -y | Out-Null
     & $sevenZip x (Join-Path $uupDir "uwp_licenses.zip") "-o$clipArchiveApps" -y | Out-Null
 
-    # 3. Apply Simplified Chinese UWP Bundles (ModernApps_zh-cn_Overlay.esd) & configure First-Logon Registration
-    Write-Host "  Applying Simplified Chinese UWP Bundles (ModernApps_zh-cn_Overlay.esd)..." -ForegroundColor Cyan
-    & $wimlib apply (Join-Path $uupDir "ModernApps_zh-cn_Overlay.esd") 1 "$mountDir\Program Files\WindowsApps" --no-acls | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "wimlib apply failed for ModernApps_zh-cn_Overlay.esd" }
-    icacls.exe "$mountDir\Program Files\WindowsApps" /grant "*S-1-15-2-1:(OI)(CI)(RX)" /Q | Out-Null
-
-    $scriptsDir = "$mountDir\Windows\Setup\Scripts"
-    New-Item -ItemType Directory -Force -Path $scriptsDir | Out-Null
-    $regUwpScript = @'
-$ErrorActionPreference = "SilentlyContinue"
-$appsRoot = "C:\Program Files\WindowsApps"
-icacls.exe $appsRoot /grant "*S-1-15-2-1:(OI)(CI)(RX)" /Q | Out-Null
-Get-ChildItem "$appsRoot\Microsoft.VCLibs*_x64__8wekyb3d8bbwe\AppxManifest.xml",
-              "$appsRoot\Microsoft.NET.Native*_x64__8wekyb3d8bbwe\AppxManifest.xml",
-              "$appsRoot\Microsoft.UI.Xaml*_x64__8wekyb3d8bbwe\AppxManifest.xml" -ErrorAction SilentlyContinue | ForEach-Object {
-    Add-AppxPackage -Register $_.FullName -DisableDevelopmentMode
-}
-Get-ChildItem "$appsRoot\*_neutral_~_8wekyb3d8bbwe\AppxMetadata\AppxBundleManifest.xml" -ErrorAction SilentlyContinue | Sort-Object FullName | ForEach-Object {
-    Add-AppxPackage -Register $_.FullName -DisableDevelopmentMode
-}
-'@
-    [System.IO.File]::WriteAllText("$scriptsDir\RegisterClientZhUwp.ps1", $regUwpScript, [System.Text.Encoding]::UTF8)
-
-    reg.exe load "HKLM\MOUNT_DEFAULT" "$mountDir\Users\Default\NTUSER.DAT" | Out-Null
-    try {
-        reg.exe add "HKLM\MOUNT_DEFAULT\Software\Microsoft\Windows\CurrentVersion\RunOnce" /v "RegisterClientZhUwp" /t REG_SZ /d "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\RegisterClientZhUwp.ps1" /f | Out-Null
-    } finally {
-        [GC]::Collect()
-        [GC]::WaitForPendingFinalizers()
-        reg.exe unload "HKLM\MOUNT_DEFAULT" | Out-Null
-    }
-    Write-Host "  Applied Simplified Chinese UWP Overlay & First-Logon Bundle Registration [OK]" -ForegroundColor Green
+    Write-Host "  Native 100% Offline UWP & Localization Provisioning Complete [OK]" -ForegroundColor Green
 } finally {
     dism.exe /Unmount-Wim /MountDir:$mountDir /Commit
     if ($LASTEXITCODE -ne 0) { throw "DISM Unmount-Wim workWim failed" }
